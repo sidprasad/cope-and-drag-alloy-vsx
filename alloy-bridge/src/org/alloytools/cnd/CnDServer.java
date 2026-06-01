@@ -146,7 +146,6 @@ public class CnDServer {
                 case "list":   return doList();
                 case "run":    return doRun(req.has("index") ? req.get("index").getAsInt() : 0);
                 case "next":   return doNext();
-                case "fork":   return doFork(req.has("state") ? req.get("state").getAsInt() : -1);
                 case "eval":   return doEval(req.get("expr").getAsString(),
                                              req.has("state") ? req.get("state").getAsInt() : 0);
                 default:       return err("Unknown op: " + op);
@@ -187,29 +186,13 @@ public class CnDServer {
     }
 
     /**
-     * Fork the current temporal trace: keep the prefix up to {@code state} and find a different
-     * continuation (Alloy's "New Fork"). {@code state < 0} defaults to the last state, i.e. an
-     * alternative future from the end of the trace. Only meaningful for temporal (var) models.
+     * Standard instance response. For temporal models the XML already contains the full trace (all
+     * states + loopback metadata), so Cope and Drag handles stepping through states itself.
      */
-    private String doFork(int state) throws Exception {
-        if (current == null) return err("Run a command before forking.");
-        if (!current.isTemporal()) return err("Fork applies to temporal (var) models only.");
-        if (state < 0) state = Math.max(0, current.getTraceLength() - 1);
-        A4Solution forked = current.fork(state);
-        if (forked == null || !forked.satisfiable())
-            return err("No alternative trace forking at state " + state + ".");
-        current = forked;
-        return instanceJson(null);
-    }
-
-    /** Standard instance response: the XML plus trace metadata so the UI knows whether to offer Fork. */
     private String instanceJson(String command) throws Exception {
         JsonObject r = ok();
         if (command != null) r.addProperty("command", command);
         r.addProperty("xml", toXML(current));
-        r.addProperty("temporal", current.isTemporal());
-        r.addProperty("traceLength", current.getTraceLength());
-        r.addProperty("loopState", current.getLoopState());
         return gson.toJson(r);
     }
 

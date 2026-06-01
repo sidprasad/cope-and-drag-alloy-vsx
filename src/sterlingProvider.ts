@@ -19,8 +19,6 @@ export interface SterlingInstance {
   id: string;
   xml: string;
   generatorName?: string;
-  /** True for temporal (var) instances — they additionally get a "Fork" button. */
-  temporal?: boolean;
 }
 
 export interface SterlingHandlers {
@@ -30,8 +28,6 @@ export interface SterlingHandlers {
   run(generatorName: string | undefined): Promise<SterlingInstance | null>;
   /** Enumerate the next instance of the current command. */
   next(): Promise<SterlingInstance | null>;
-  /** Fork the current temporal trace (alternative continuation). */
-  fork(): Promise<SterlingInstance | null>;
   /** Evaluate an expression against the current instance; return the result string. */
   evaluate(expression: string): Promise<string>;
 }
@@ -132,15 +128,13 @@ export class SterlingProvider {
       }
 
       case 'click': {
-        // Datum buttons ("Next" -> enumerate, "Fork" -> fork the trace) and the explorer's
+        // A datum's "Next" button (onClick 'next' -> enumerate) or the explorer's
         // "Run <generator>" button (onClick 'run' / context.generatorName -> run).
         const onClick = msg.payload?.onClick;
         const inst =
           onClick === 'next'
             ? await this.safe(() => this.handlers.next())
-            : onClick === 'fork'
-              ? await this.safe(() => this.handlers.fork())
-              : await this.safe(() => this.handlers.run(msg.payload?.context?.generatorName));
+            : await this.safe(() => this.handlers.run(msg.payload?.context?.generatorName));
         if (inst) {
           this.current = inst;
           this.broadcast(this.dataMessage(inst));
@@ -190,9 +184,9 @@ export class SterlingProvider {
             data: inst.xml,
             evaluator: true,
             // The graph header renders a button per entry; clicking sends a `click` with this
-            // `onClick`, which we route. Without this there is no "Next"/"Fork" control. Fork only
-            // applies to temporal traces, so it's offered only for temporal instances.
-            buttons: instanceButtons(inst)
+            // `onClick`, which we route to enumeration. Without this there is no "Next" control.
+            // (Temporal trace navigation is handled by Cope and Drag itself, given the full trace.)
+            buttons: [{ text: 'Next', onClick: 'next', mouseover: 'Show the next instance' }]
           }
         ],
         update: [],
@@ -216,13 +210,4 @@ export class SterlingProvider {
       return null;
     }
   }
-}
-
-/** Buttons for an instance: always "Next"; plus "Fork" when it's a temporal trace. */
-function instanceButtons(inst: SterlingInstance): Array<{ text: string; onClick: string; mouseover: string }> {
-  const buttons = [{ text: 'Next', onClick: 'next', mouseover: 'Show the next instance' }];
-  if (inst.temporal) {
-    buttons.push({ text: 'Fork', onClick: 'fork', mouseover: 'Fork the trace: an alternative continuation' });
-  }
-  return buttons;
 }

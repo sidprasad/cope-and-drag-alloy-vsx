@@ -16,7 +16,6 @@ let provider: SterlingProvider | undefined;
 let currentFile: string | undefined;
 let currentCommand: string | undefined;
 let lastRawXml: string | undefined;
-let lastTemporal = false;
 let specWatcher: vscode.FileSystemWatcher | undefined;
 let specReloadTimer: ReturnType<typeof setTimeout> | undefined;
 let output: vscode.OutputChannel;
@@ -111,15 +110,11 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
     run: async (name) => {
       const cmds = await client.list();
       const r = await client.run(name ? Math.max(0, cmds.indexOf(name)) : 0);
-      return buildInstance(r.xml, r.command ?? '', r.temporal);
+      return buildInstance(r.xml, r.command ?? '');
     },
     next: async () => {
       const r = await client.next();
-      return buildInstance(r.xml, currentCommand ?? '', r.temporal);
-    },
-    fork: async () => {
-      const r = await client.fork();
-      return buildInstance(r.xml, currentCommand ?? '', r.temporal);
+      return buildInstance(r.xml, currentCommand ?? '');
     },
     evaluate: (expr) => client.evaluate(expr)
   });
@@ -138,12 +133,11 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
  * Cope and Drag keys a datum's layout spec by its generator name. Also records the raw XML so an
  * edited `.cnd` can be re-applied to this same instance (see reloadCndLayout).
  */
-function buildInstance(rawXml: string, command: string, temporal: boolean): SterlingInstance {
+function buildInstance(rawXml: string, command: string): SterlingInstance {
   lastRawXml = rawXml;
   currentCommand = command;
-  lastTemporal = temporal;
   const spec = currentFile ? readCndSpec(currentFile) : undefined;
-  return { id: 'i' + idCounter(), xml: injectVisualizer(rawXml, spec), generatorName: command, temporal };
+  return { id: 'i' + idCounter(), xml: injectVisualizer(rawXml, spec), generatorName: command };
 }
 
 /** Watch the model's sidecar `.cnd` so saving it re-applies the layout (debounced). */
@@ -183,8 +177,7 @@ function reloadCndLayout(): void {
   provider.setCurrent({
     id: 'i' + idCounter(),
     xml: injectVisualizer(lastRawXml, spec),
-    generatorName: currentCommand,
-    temporal: lastTemporal
+    generatorName: currentCommand
   });
   reloadCndWebview();
 }
@@ -194,7 +187,7 @@ async function runIndex(index: number): Promise<void> {
   if (!cndClient || !provider) return;
   try {
     const r = await cndClient.run(index);
-    provider.pushInstance(buildInstance(r.xml, r.command ?? '', r.temporal));
+    provider.pushInstance(buildInstance(r.xml, r.command ?? ''));
   } catch (e) {
     vscode.window.showWarningMessage(`Alloy: ${e instanceof Error ? e.message : String(e)}`);
   }
