@@ -15,6 +15,8 @@ import * as path from 'path';
 let panel: vscode.WebviewPanel | undefined;
 let server: http.Server | undefined;
 let staticPort: number | undefined;
+let lastFrameUri: vscode.Uri | undefined;
+let reloadToken = 0;
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -82,6 +84,7 @@ export async function openCndWebview(context: vscode.ExtensionContext, wsPort: n
 
   const port = await ensureServer(root);
   const frameUri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${port}/?${wsPort}`));
+  lastFrameUri = frameUri;
   const html = getHtml(frameUri);
 
   if (panel) {
@@ -102,9 +105,20 @@ export async function openCndWebview(context: vscode.ExtensionContext, wsPort: n
   panel.webview.html = html;
 }
 
+/**
+ * Reload the Cope and Drag iframe (same Sterling port), discarding CnD's in-memory layout state so
+ * an edited spec is re-seeded from the replayed instance. No-op if the panel isn't open.
+ */
+export function reloadCndWebview(): void {
+  if (!panel || !lastFrameUri) return;
+  reloadToken++; // change the outer document so VS Code re-renders it, forcing a fresh iframe load
+  panel.webview.html = getHtml(lastFrameUri);
+}
+
 export function disposeCndWebview(): void {
   panel?.dispose();
   panel = undefined;
+  lastFrameUri = undefined;
   if (server) {
     server.close();
     server = undefined;
@@ -120,6 +134,7 @@ function getHtml(frameUri: vscode.Uri): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- reload ${reloadToken} -->
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none'; frame-src ${frameOrigin} https:; style-src 'unsafe-inline';" />

@@ -38,6 +38,15 @@
           ".als"
         ],
         "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "yaml",
+        "extensions": [
+          ".cnd"
+        ],
+        "aliases": [
+          "Cope and Drag spec"
+        ]
       }
     ],
     "grammars": [
@@ -53,6 +62,12 @@
         "title": "Open Cope and Drag",
         "category": "Alloy",
         "icon": "$(graph)"
+      },
+      {
+        "command": "alloy.reloadCnd",
+        "title": "Reload Cope and Drag Layout",
+        "category": "Alloy",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {

@@ -2,17 +2,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { CnDServerClient } from './cndServerClient';
-import { SterlingProvider } from './sterlingProvider';
-import { openCndWebview, disposeCndWebview } from './cndWebview';
+import { SterlingProvider, SterlingInstance } from './sterlingProvider';
+import { openCndWebview, disposeCndWebview, reloadCndWebview } from './cndWebview';
 import { resolveJava, resolveAlloyJar } from './resolve';
 import { obtainAlloyJar } from './downloadAlloy';
 import { AlloyCommandCodeLensProvider } from './codeLens';
 import { startAlloyLsp } from './languageClient';
 import { activateDiagnostics } from './diagnostics';
+import { cndSidecarPath, readCndSpec, injectVisualizer } from './cndSpec';
 
 let cndClient: CnDServerClient | undefined;
 let provider: SterlingProvider | undefined;
 let currentFile: string | undefined;
+let currentCommand: string | undefined;
+let lastRawXml: string | undefined;
+let specWatcher: vscode.FileSystemWatcher | undefined;
+let specReloadTimer: ReturnType<typeof setTimeout> | undefined;
 let output: vscode.OutputChannel;
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -23,6 +28,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('alloy.runCommand', (uri: vscode.Uri, index: number) =>
       runFileCommand(context, uri, index)
     ),
+    vscode.commands.registerCommand('alloy.reloadCnd', () => reloadCndLayout()),
     vscode.languages.registerCodeLensProvider({ language: 'alloy' }, new AlloyCommandCodeLensProvider()),
     { dispose: tearDown }
   );
@@ -104,15 +110,71 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
     run: async (name) => {
       const cmds = await client.list();
       const r = await client.run(name ? Math.max(0, cmds.indexOf(name)) : 0);
-      return { id: 'i' + idCounter(), xml: r.xml, generatorName: r.command };
+      return buildInstance(r.xml, r.command);
     },
-    next: async () => ({ id: 'i' + idCounter(), xml: await client.next() }),
+    next: async () => buildInstance(await client.next(), currentCommand ?? ''),
     evaluate: (expr) => client.evaluate(expr)
   });
   const wsPort = await provider.start();
   await openCndWebview(context, wsPort);
   currentFile = file;
+  watchSpec(file);
   return true;
+}
+
+/**
+ * Build a Sterling instance from raw Alloy XML: splice in the sidecar `.cnd` layout (if any) and tag
+ * it with the command name. The command tag is what makes the layout persist across enumeration —
+ * Cope and Drag keys a datum's layout spec by its generator name. Also records the raw XML so an
+ * edited `.cnd` can be re-applied to this same instance (see reloadCndLayout).
+ */
+function buildInstance(rawXml: string, command: string): SterlingInstance {
+  lastRawXml = rawXml;
+  currentCommand = command;
+  const spec = currentFile ? readCndSpec(currentFile) : undefined;
+  return { id: 'i' + idCounter(), xml: injectVisualizer(rawXml, spec), generatorName: command };
+}
+
+/** Watch the model's sidecar `.cnd` so saving it re-applies the layout (debounced). */
+function watchSpec(file: string): void {
+  disposeSpecWatcher();
+  const sidecar = cndSidecarPath(file);
+  const watcher = vscode.workspace.createFileSystemWatcher(
+    new vscode.RelativePattern(path.dirname(sidecar), path.basename(sidecar))
+  );
+  const schedule = () => {
+    if (specReloadTimer) clearTimeout(specReloadTimer);
+    specReloadTimer = setTimeout(() => reloadCndLayout(), 250);
+  };
+  watcher.onDidChange(schedule);
+  watcher.onDidCreate(schedule);
+  watcher.onDidDelete(schedule);
+  specWatcher = watcher;
+}
+
+function disposeSpecWatcher(): void {
+  if (specReloadTimer) {
+    clearTimeout(specReloadTimer);
+    specReloadTimer = undefined;
+  }
+  specWatcher?.dispose();
+  specWatcher = undefined;
+}
+
+/**
+ * Re-read the sidecar `.cnd` and re-apply it to the instance currently on screen by reloading the
+ * Cope and Drag iframe (which resets CnD's per-command layout cache so the new spec takes effect).
+ * Invoked by the "Reload Cope and Drag Layout" command and automatically when the `.cnd` is saved.
+ */
+function reloadCndLayout(): void {
+  if (!provider || lastRawXml === undefined || currentCommand === undefined) return;
+  const spec = currentFile ? readCndSpec(currentFile) : undefined;
+  provider.setCurrent({
+    id: 'i' + idCounter(),
+    xml: injectVisualizer(lastRawXml, spec),
+    generatorName: currentCommand
+  });
+  reloadCndWebview();
 }
 
 /** Run the command at `index` and push the instance to the visualizer. */
@@ -120,7 +182,7 @@ async function runIndex(index: number): Promise<void> {
   if (!cndClient || !provider) return;
   try {
     const r = await cndClient.run(index);
-    provider.pushInstance({ id: 'i' + idCounter(), xml: r.xml, generatorName: r.command });
+    provider.pushInstance(buildInstance(r.xml, r.command));
   } catch (e) {
     vscode.window.showWarningMessage(`Alloy: ${e instanceof Error ? e.message : String(e)}`);
   }
@@ -132,10 +194,13 @@ function idCounter(): string {
 }
 
 function tearDown(): void {
+  disposeSpecWatcher();
   disposeCndWebview();
   provider?.dispose();
   provider = undefined;
   cndClient?.dispose();
   cndClient = undefined;
   currentFile = undefined;
+  currentCommand = undefined;
+  lastRawXml = undefined;
 }

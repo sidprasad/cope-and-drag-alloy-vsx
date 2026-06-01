@@ -36,6 +36,11 @@ export class SterlingProvider {
   private wss: WebSocketServer | undefined;
   private readonly sockets = new Set<WebSocket>();
   private current: SterlingInstance | undefined;
+  // On (re)connect, Cope and Drag fires one `data` request to fetch the initial instance. If we
+  // already have a `current` (e.g. the iframe was reloaded to apply an edited layout), that request
+  // must replay `current` rather than enumerate the *next* instance — otherwise reloading the
+  // layout would silently advance the model. This one-shot flag arms that replay per connect.
+  private replayPending = false;
 
   constructor(private readonly handlers: SterlingHandlers) {}
 
@@ -62,6 +67,14 @@ export class SterlingProvider {
     this.broadcast(this.dataMessage(instance));
   }
 
+  /**
+   * Replace the current instance without broadcasting. Used before reloading the webview to apply an
+   * edited layout: the fresh iframe reconnects and is replayed `current` (with the new spec).
+   */
+  setCurrent(instance: SterlingInstance): void {
+    this.current = instance;
+  }
+
   dispose(): void {
     for (const ws of this.sockets) {
       try { ws.close(); } catch { /* ignore */ }
@@ -76,9 +89,13 @@ export class SterlingProvider {
     this.sockets.add(ws);
     ws.on('close', () => this.sockets.delete(ws));
     ws.on('message', (raw) => void this.onMessage(ws, raw.toString()));
-    // Announce metadata; replay the current instance if a run already happened.
+    // Announce metadata; replay the current instance if a run already happened. Arm the one-shot so
+    // CnD's connect-time `data` request replays this instance instead of advancing past it.
     void this.sendMeta(ws);
-    if (this.current) this.sendJson(ws, this.dataMessage(this.current));
+    if (this.current) {
+      this.replayPending = true;
+      this.sendJson(ws, this.dataMessage(this.current));
+    }
   }
 
   private async onMessage(ws: WebSocket, text: string): Promise<void> {
@@ -95,7 +112,13 @@ export class SterlingProvider {
         break;
 
       case 'data': {
-        // CnD's "next instance" request.
+        // CnD's "next instance" request. The first one after a (re)connect with an existing
+        // instance is the connect-time fetch — replay `current` instead of enumerating.
+        if (this.replayPending) {
+          this.replayPending = false;
+          if (this.current) this.sendJson(ws, this.dataMessage(this.current));
+          break;
+        }
         const inst = await this.safe(() => this.handlers.next());
         if (inst) {
           this.current = inst;
