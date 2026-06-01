@@ -7,6 +7,7 @@ import { openCndWebview, disposeCndWebview } from './cndWebview';
 import { resolveJava, resolveAlloyJar } from './resolve';
 import { obtainAlloyJar } from './downloadAlloy';
 import { AlloyCommandCodeLensProvider } from './codeLens';
+import { startAlloyLsp } from './languageClient';
 
 let cndClient: CnDServerClient | undefined;
 let provider: SterlingProvider | undefined;
@@ -24,6 +25,10 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.languages.registerCodeLensProvider({ language: 'alloy' }, new AlloyCommandCodeLensProvider()),
     { dispose: tearDown }
   );
+
+  // Editor features (diagnostics/hover/nav) via the Alloy jar's language server — independent of
+  // the visualizer. No-op if no Alloy jar is available yet; retried after one is obtained.
+  startAlloyLsp(context);
 }
 
 export function deactivate(): void {
@@ -74,6 +79,9 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
   }
   output.appendLine(`[alloy] java: ${java}`);
   output.appendLine(`[alloy] alloy jar (${source}): ${alloyJar}`);
+
+  // A jar is now available — start the language server if it wasn't already (idempotent).
+  startAlloyLsp(context);
 
   const client = new CnDServerClient(java, alloyJar, serverJar, (m) => output.append(m));
   try {
