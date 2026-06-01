@@ -108,7 +108,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "bundle": "node scripts/bundle-assets.js",
-    "package": "vsce package"
+    "package": "vsce package",
+    "tag": "node scripts/tag-release.js"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
