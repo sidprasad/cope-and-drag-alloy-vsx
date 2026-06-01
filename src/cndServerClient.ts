@@ -2,9 +2,12 @@ import { spawn, ChildProcess } from 'child_process';
 import * as net from 'net';
 import * as path from 'path';
 
-export interface RunResult {
-  command: string;
+export interface Instance {
+  command?: string;
   xml: string;
+  /** True for temporal (var) models — drives whether the visualizer offers a Fork button. */
+  temporal: boolean;
+  traceLength: number;
 }
 
 /**
@@ -92,18 +95,24 @@ export class CnDServerClient {
     return this.rpc({ op: 'list' }).then((r) => (r.ok ? r.commands : []));
   }
 
-  run(index: number): Promise<RunResult> {
-    return this.rpc({ op: 'run', index }).then((r) => {
-      if (!r.ok) throw new Error(r.error);
-      return { command: r.command, xml: r.xml };
-    });
+  private toInstance(r: any): Instance {
+    if (!r.ok) throw new Error(r.error);
+    return { command: r.command, xml: r.xml, temporal: !!r.temporal, traceLength: r.traceLength ?? 1 };
   }
 
-  next(): Promise<string> {
-    return this.rpc({ op: 'next' }).then((r) => {
-      if (!r.ok) throw new Error(r.error);
-      return r.xml;
-    });
+  run(index: number): Promise<Instance> {
+    return this.rpc({ op: 'run', index }).then((r) => this.toInstance(r));
+  }
+
+  next(): Promise<Instance> {
+    return this.rpc({ op: 'next' }).then((r) => this.toInstance(r));
+  }
+
+  /** Fork a temporal trace at `state` (default: the last state) — Alloy's "New Fork". */
+  fork(state?: number): Promise<Instance> {
+    const req: { op: string; state?: number } = { op: 'fork' };
+    if (state !== undefined) req.state = state;
+    return this.rpc(req).then((r) => this.toInstance(r));
   }
 
   evaluate(expr: string): Promise<string> {

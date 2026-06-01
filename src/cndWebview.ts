@@ -17,6 +17,9 @@ let server: http.Server | undefined;
 let staticPort: number | undefined;
 let lastFrameUri: vscode.Uri | undefined;
 let reloadToken = 0;
+// Called when the user closes the panel (so the extension can tear the session down). Cleared
+// before a programmatic dispose so closing it ourselves doesn't re-enter teardown.
+let onClose: (() => void) | undefined;
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -72,8 +75,15 @@ function ensureServer(root: string): Promise<number> {
   });
 }
 
-/** Open (or refresh) the Cope and Drag panel, pointing CnD at the given Sterling websocket port. */
-export async function openCndWebview(context: vscode.ExtensionContext, wsPort: number): Promise<void> {
+/**
+ * Open (or refresh) the Cope and Drag panel, pointing CnD at the given Sterling websocket port.
+ * `closeCb` is invoked if the user closes the panel, so the caller can tear the session down.
+ */
+export async function openCndWebview(
+  context: vscode.ExtensionContext,
+  wsPort: number,
+  closeCb?: () => void
+): Promise<void> {
   const root = context.asAbsolutePath(path.join('media', 'copeanddrag'));
   if (!fs.existsSync(path.join(root, 'index.html'))) {
     vscode.window.showErrorMessage(
@@ -85,6 +95,7 @@ export async function openCndWebview(context: vscode.ExtensionContext, wsPort: n
   const port = await ensureServer(root);
   const frameUri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${port}/?${wsPort}`));
   lastFrameUri = frameUri;
+  onClose = closeCb;
   const html = getHtml(frameUri);
 
   if (panel) {
@@ -101,6 +112,10 @@ export async function openCndWebview(context: vscode.ExtensionContext, wsPort: n
   );
   panel.onDidDispose(() => {
     panel = undefined;
+    // User closed the window — hand off to the teardown callback (cleared first so it runs once).
+    const cb = onClose;
+    onClose = undefined;
+    cb?.();
   });
   panel.webview.html = html;
 }
@@ -116,6 +131,7 @@ export function reloadCndWebview(): void {
 }
 
 export function disposeCndWebview(): void {
+  onClose = undefined; // we're closing it ourselves — don't fire the user-close callback
   panel?.dispose();
   panel = undefined;
   lastFrameUri = undefined;

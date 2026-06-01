@@ -16,6 +16,7 @@ let provider: SterlingProvider | undefined;
 let currentFile: string | undefined;
 let currentCommand: string | undefined;
 let lastRawXml: string | undefined;
+let lastTemporal = false;
 let specWatcher: vscode.FileSystemWatcher | undefined;
 let specReloadTimer: ReturnType<typeof setTimeout> | undefined;
 let output: vscode.OutputChannel;
@@ -110,13 +111,22 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
     run: async (name) => {
       const cmds = await client.list();
       const r = await client.run(name ? Math.max(0, cmds.indexOf(name)) : 0);
-      return buildInstance(r.xml, r.command);
+      return buildInstance(r.xml, r.command ?? '', r.temporal);
     },
-    next: async () => buildInstance(await client.next(), currentCommand ?? ''),
+    next: async () => {
+      const r = await client.next();
+      return buildInstance(r.xml, currentCommand ?? '', r.temporal);
+    },
+    fork: async () => {
+      const r = await client.fork();
+      return buildInstance(r.xml, currentCommand ?? '', r.temporal);
+    },
     evaluate: (expr) => client.evaluate(expr)
   });
   const wsPort = await provider.start();
-  await openCndWebview(context, wsPort);
+  // Closing the panel tears the whole session down (kills the Java backend + ws server), so the
+  // next "Open Cope and Drag" starts fresh rather than reusing stale state.
+  await openCndWebview(context, wsPort, () => tearDown());
   currentFile = file;
   watchSpec(file);
   return true;
@@ -128,11 +138,12 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
  * Cope and Drag keys a datum's layout spec by its generator name. Also records the raw XML so an
  * edited `.cnd` can be re-applied to this same instance (see reloadCndLayout).
  */
-function buildInstance(rawXml: string, command: string): SterlingInstance {
+function buildInstance(rawXml: string, command: string, temporal: boolean): SterlingInstance {
   lastRawXml = rawXml;
   currentCommand = command;
+  lastTemporal = temporal;
   const spec = currentFile ? readCndSpec(currentFile) : undefined;
-  return { id: 'i' + idCounter(), xml: injectVisualizer(rawXml, spec), generatorName: command };
+  return { id: 'i' + idCounter(), xml: injectVisualizer(rawXml, spec), generatorName: command, temporal };
 }
 
 /** Watch the model's sidecar `.cnd` so saving it re-applies the layout (debounced). */
@@ -172,7 +183,8 @@ function reloadCndLayout(): void {
   provider.setCurrent({
     id: 'i' + idCounter(),
     xml: injectVisualizer(lastRawXml, spec),
-    generatorName: currentCommand
+    generatorName: currentCommand,
+    temporal: lastTemporal
   });
   reloadCndWebview();
 }
@@ -182,7 +194,7 @@ async function runIndex(index: number): Promise<void> {
   if (!cndClient || !provider) return;
   try {
     const r = await cndClient.run(index);
-    provider.pushInstance(buildInstance(r.xml, r.command));
+    provider.pushInstance(buildInstance(r.xml, r.command ?? '', r.temporal));
   } catch (e) {
     vscode.window.showWarningMessage(`Alloy: ${e instanceof Error ? e.message : String(e)}`);
   }
