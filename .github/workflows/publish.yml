@@ -1,0 +1,75 @@
+name: Publish
+
+# Publishes to the VS Code Marketplace. Trigger by pushing a version tag that matches
+# package.json's "version" (e.g. v0.1.0), or run manually from the Actions tab.
+#
+# Requires one repository secret:
+#   VSCE_PAT  - a Marketplace (Manage) Personal Access Token for the publisher.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      cnd_release:
+        description: 'copeanddrag release tag to pull the Sterling (forge) dist from'
+        required: false
+        default: 'v4.0.4'
+
+permissions:
+  contents: read
+
+env:
+  # The extension does not build Cope and Drag; it ships a prebuilt build:forge dist pulled from
+  # this public release. Bump when you want a newer Cope and Drag (workflow_dispatch can override).
+  CND_RELEASE: ${{ github.event.inputs.cnd_release || 'v4.0.4' }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Fetch Cope and Drag (forge) dist
+        run: |
+          set -euo pipefail
+          url="https://github.com/sidprasad/copeanddrag/releases/download/${CND_RELEASE}/sterling-forge.zip"
+          echo "Downloading $url"
+          curl -fsSL -o sterling-forge.zip "$url"
+          mkdir -p cnd-dist
+          unzip -q sterling-forge.zip -d cnd-dist
+          test -f cnd-dist/index.html
+          echo "CND_DIST=$PWD/cnd-dist" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Runs `vscode:prepublish` (npm run bundle && npm run compile): compiles the Java bridge
+      # against a pinned Alloy release (downloaded), copies CND_DIST -> media/, and builds the TS.
+      # JAVA_HOME is set by setup-java; CND_DIST is set above.
+      - name: Package VSIX
+        run: npx @vscode/vsce package -o cope-and-drag-alloy.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cope-and-drag-alloy-vsix
+          path: cope-and-drag-alloy.vsix
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx @vscode/vsce publish --packagePath cope-and-drag-alloy.vsix
