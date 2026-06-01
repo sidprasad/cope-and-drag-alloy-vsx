@@ -1,0 +1,7 @@
+# Sidecar layout for graph.als (edit + save to live-update the visualizer).
+constraints:
+  - orientation:
+      selector: edges
+      directions: [directlyRight]
+directives:
+  - flag: hideDisconnected
