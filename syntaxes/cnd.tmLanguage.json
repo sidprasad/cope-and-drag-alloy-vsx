@@ -1,0 +1,84 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Cope and Drag spec",
+  "scopeName": "source.cnd",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#top-level-keys" },
+    { "include": "#constraint-ops" },
+    { "include": "#directive-ops" },
+    { "include": "#directions-flow" },
+    { "include": "#sub-keys" },
+    { "include": "#value-keywords" },
+    { "include": "#direction-list-item" },
+    { "include": "source.yaml" }
+  ],
+  "repository": {
+    "comments": {
+      "match": "(^|\\s)(#.*)$",
+      "captures": {
+        "2": { "name": "comment.line.number-sign.cnd" }
+      }
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.cnd",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.cnd" }]
+        },
+        {
+          "name": "string.quoted.single.cnd",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "top-level-keys": {
+      "match": "\\b(constraints|directives|projections|projection|temporal|sequence)\\b(?=\\s*:)",
+      "name": "keyword.control.cnd"
+    },
+    "constraint-ops": {
+      "match": "\\b(orientation|cyclic|align|group|size|hideAtom)\\b(?=\\s*:)",
+      "name": "entity.name.function.constraint.cnd"
+    },
+    "directive-ops": {
+      "match": "\\b(atomColor|edgeColor|icon|attribute|hideField|inferredEdge|tag|flag)\\b(?=\\s*:)",
+      "name": "entity.name.function.directive.cnd"
+    },
+    "sub-keys": {
+      "match": "\\b(selector|field|filter|directions|direction|groupOn|addToGroup|addEdge|name|value|color|path|showLabels|showLabel|style|weight|hidden|highlight|height|width|toTag|orderBy|sig|type|policy|hold)\\b(?=\\s*:)",
+      "name": "variable.parameter.cnd"
+    },
+    "value-keywords": {
+      "match": "\\b(clockwise|counterclockwise|horizontal|vertical|dashed|dotted|solid|hideDisconnectedBuiltIns|hideDisconnected|ignore_history|stability|change_emphasis|random_positioning)\\b",
+      "name": "constant.language.cnd"
+    },
+    "directions-flow": {
+      "begin": "\\b(directions)\\b(\\s*)(:)(\\s*)(\\[)",
+      "beginCaptures": {
+        "1": { "name": "variable.parameter.cnd" },
+        "3": { "name": "punctuation.separator.key-value.cnd" },
+        "5": { "name": "punctuation.definition.array.begin.cnd" }
+      },
+      "end": "\\]",
+      "endCaptures": { "0": { "name": "punctuation.definition.array.end.cnd" } },
+      "patterns": [
+        {
+          "match": "\\b(directlyLeft|directlyRight|directlyAbove|directlyBelow|left|right|above|below)\\b",
+          "name": "constant.language.direction.cnd"
+        }
+      ]
+    },
+    "direction-list-item": {
+      "match": "^\\s*(-)\\s*(directlyLeft|directlyRight|directlyAbove|directlyBelow|left|right|above|below)\\s*(#.*)?$",
+      "captures": {
+        "1": { "name": "punctuation.definition.block.sequence.item.cnd" },
+        "2": { "name": "constant.language.direction.cnd" },
+        "3": { "name": "comment.line.number-sign.cnd" }
+      }
+    }
+  }
+}

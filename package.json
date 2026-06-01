@@ -40,13 +40,15 @@
         "configuration": "./language-configuration.json"
       },
       {
-        "id": "yaml",
+        "id": "cnd",
+        "aliases": [
+          "Cope and Drag spec",
+          "cnd"
+        ],
         "extensions": [
           ".cnd"
         ],
-        "aliases": [
-          "Cope and Drag spec"
-        ]
+        "configuration": "./cnd-language-configuration.json"
       }
     ],
     "grammars": [
@@ -54,6 +56,11 @@
         "language": "alloy",
         "scopeName": "source.alloy",
         "path": "./syntaxes/alloy.tmLanguage.json"
+      },
+      {
+        "language": "cnd",
+        "scopeName": "source.cnd",
+        "path": "./syntaxes/cnd.tmLanguage.json"
       }
     ],
     "commands": [
