@@ -219,7 +219,15 @@ public class CnDServer {
         try (PrintWriter pw = new PrintWriter(sw)) {
             A4SolutionWriter.writeInstance(null, sol, pw, Collections.emptyList(), Collections.emptyMap());
         }
-        return sw.toString();
+        String xml = sw.toString();
+        // Cope and Drag recognizes a temporal trace by a `backloop` attribute (the loop-back state
+        // index) on <instance>; Alloy writes `looplength` instead, which CnD ignores. Add `backloop`
+        // (= getLoopState() = tracelength - looplength) to every state so CnD renders the trace and
+        // shows its time stepper. Only for temporal solutions (static instances are not traces).
+        if (sol.isTemporal()) {
+            xml = xml.replace("<instance ", "<instance backloop=\"" + sol.getLoopState() + "\" ");
+        }
+        return xml;
     }
 
     private JsonObject ok() {
