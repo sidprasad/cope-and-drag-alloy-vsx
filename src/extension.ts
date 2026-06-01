@@ -8,6 +8,7 @@ import { resolveJava, resolveAlloyJar } from './resolve';
 import { obtainAlloyJar } from './downloadAlloy';
 import { AlloyCommandCodeLensProvider } from './codeLens';
 import { startAlloyLsp } from './languageClient';
+import { activateDiagnostics } from './diagnostics';
 
 let cndClient: CnDServerClient | undefined;
 let provider: SterlingProvider | undefined;
@@ -26,8 +27,11 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: tearDown }
   );
 
-  // Editor features (diagnostics/hover/nav) via the Alloy jar's language server — independent of
-  // the visualizer. No-op if no Alloy jar is available yet; retried after one is obtained.
+  // On-save error checking via Alloy's compiler (the bridge's `check`), published as diagnostics.
+  activateDiagnostics(context);
+
+  // Nav features (symbols/def/refs/rename) via the Alloy jar's language server — independent of the
+  // visualizer. No-op if no Alloy jar is available yet; retried after one is obtained.
   startAlloyLsp(context);
 }
 

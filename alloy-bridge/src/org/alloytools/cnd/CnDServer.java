@@ -9,6 +9,7 @@ import java.io.StringWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +20,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import edu.mit.csail.sdg.alloy4.A4Reporter;
+import edu.mit.csail.sdg.alloy4.Err;
+import edu.mit.csail.sdg.alloy4.ErrorWarning;
+import edu.mit.csail.sdg.alloy4.Pos;
 import edu.mit.csail.sdg.ast.Command;
 import edu.mit.csail.sdg.ast.Expr;
 import edu.mit.csail.sdg.ast.ExprVar;
@@ -64,11 +68,57 @@ public class CnDServer {
     }
 
     public static void main(String[] args) throws Exception {
+        // One-shot parse/type-check for diagnostics: `CnDServer check <file.als>` -> JSON on stdout.
+        if (args.length >= 2 && args[0].equals("check")) {
+            System.out.println(new CnDServer(args[1]).doCheck());
+            return;
+        }
         if (args.length < 2) {
-            System.err.println("usage: CnDServer <port> <file.als>   (port 0 = auto)");
+            System.err.println("usage: CnDServer <port> <file.als>   (port 0 = auto)  |  CnDServer check <file.als>");
             System.exit(2);
         }
         new CnDServer(args[1]).serve(Integer.parseInt(args[0]));
+    }
+
+    /**
+     * Parse + type-check the file with Alloy's own compiler and return its errors/warnings (with
+     * 0-based positions) as JSON: {"diagnostics":[{line,col,endLine,endCol,message,severity}]}.
+     * Alloy throws on the first error, so at most one "error" is reported per check, plus any
+     * warnings the compiler collected.
+     */
+    String doCheck() {
+        JsonArray diags = new JsonArray();
+        final List<ErrorWarning> warnings = new ArrayList<>();
+        A4Reporter reporter = new A4Reporter() {
+            @Override
+            public void warning(ErrorWarning w) {
+                warnings.add(w);
+            }
+        };
+        try {
+            CompUtil.parseEverything_fromFile(reporter, new HashMap<String, String>(), filename);
+        } catch (Err e) {
+            diags.add(diag(e.pos, e.msg, "error"));
+        } catch (Throwable t) {
+            diags.add(diag(Pos.UNKNOWN, t.getMessage() == null ? t.toString() : t.getMessage(), "error"));
+        }
+        for (ErrorWarning w : warnings) diags.add(diag(w.pos, w.msg, "warning"));
+        JsonObject r = new JsonObject();
+        r.add("diagnostics", diags);
+        return gson.toJson(r);
+    }
+
+    /** A diagnostic with a 0-based range, defaulting to the file start when the position is unknown. */
+    private JsonObject diag(Pos pos, String message, String severity) {
+        boolean known = pos != null && !Pos.UNKNOWN.equals(pos) && pos.y > 0;
+        JsonObject d = new JsonObject();
+        d.addProperty("line", known ? pos.y - 1 : 0);
+        d.addProperty("col", known ? Math.max(0, pos.x - 1) : 0);
+        d.addProperty("endLine", known ? pos.y2 - 1 : 0);
+        d.addProperty("endCol", known ? pos.x2 : 1);
+        d.addProperty("message", message == null ? "error" : message.trim());
+        d.addProperty("severity", severity);
+        return d;
     }
 
     private void serve(int port) throws Exception {
