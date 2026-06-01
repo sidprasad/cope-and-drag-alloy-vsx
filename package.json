@@ -40,6 +40,13 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "alloy",
+        "scopeName": "source.alloy",
+        "path": "./syntaxes/alloy.tmLanguage.json"
+      }
+    ],
     "commands": [
       {
         "command": "alloy.openCnd",

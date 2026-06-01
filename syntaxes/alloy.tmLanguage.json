@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Alloy",
+  "scopeName": "source.alloy",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#operators" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "name": "comment.block.alloy", "begin": "/\\*", "end": "\\*/" },
+        { "name": "comment.line.double-slash.alloy", "match": "//.*$" },
+        { "name": "comment.line.double-dash.alloy", "match": "--.*$" }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.alloy",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [{ "name": "constant.character.escape.alloy", "match": "\\\\." }]
+    },
+    "numbers": {
+      "name": "constant.numeric.alloy",
+      "match": "\\b[0-9]+\\b"
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.alloy",
+          "match": "\\b(run|check|assert|fact|pred|fun|open|module|for|but|exactly|expect)\\b"
+        },
+        {
+          "name": "storage.type.alloy",
+          "match": "\\b(sig|enum|var|abstract|extends|in|one|lone|some|no|set|seq|disj)\\b"
+        },
+        {
+          "name": "keyword.operator.quantifier.alloy",
+          "match": "\\b(all|some|no|lone|one|sum|let|disj)\\b"
+        },
+        {
+          "name": "keyword.operator.word.alloy",
+          "match": "\\b(and|or|not|implies|iff|else|in)\\b"
+        },
+        {
+          "name": "keyword.control.temporal.alloy",
+          "match": "\\b(always|eventually|after|before|until|releases|since|triggered|once|historically|steps)\\b"
+        },
+        {
+          "name": "constant.language.alloy",
+          "match": "\\b(iden|univ|none|Int|this)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "name": "keyword.operator.alloy",
+      "match": "(=>|<=>|->|<:|:>|\\+\\+|&&|\\|\\||!|#|&|\\^|~|\\*|\\+|-|\\.|=|<|>|@|')"
+    }
+  }
+}
