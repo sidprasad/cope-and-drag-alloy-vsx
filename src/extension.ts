@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { CnDServerClient } from './cndServerClient';
 import { SterlingProvider, SterlingInstance } from './sterlingProvider';
 import { openCndWebview, disposeCndWebview } from './cndWebview';
+import { resolveJava, resolveAlloyJar } from './resolve';
 
 let cndClient: CnDServerClient | undefined;
 let provider: SterlingProvider | undefined;
@@ -35,14 +36,25 @@ async function openForActiveFile(context: vscode.ExtensionContext): Promise<void
   tearDown();
 
   const java = resolveJava();
-  const alloyJar = resolveAlloyJar(context);
+  const { jar: alloyJar, source } = resolveAlloyJar(context);
   const serverJar = context.asAbsolutePath(path.join('server', 'cnd-alloy-server.jar'));
-  for (const [label, p] of [['Alloy jar', alloyJar], ['CnD server jar', serverJar]] as const) {
-    if (!fs.existsSync(p)) {
-      vscode.window.showErrorMessage(`${label} not found at ${p}. Run "npm run bundle" in the extension folder.`);
-      return;
-    }
+
+  if (!alloyJar) {
+    vscode.window.showErrorMessage(
+      'No Alloy Analyzer found. Set "alloy.jarPath" to an Alloy 6+ jar, or rebuild the extension ("npm run bundle") to bundle one.'
+    );
+    return;
   }
+  if (!fs.existsSync(alloyJar)) {
+    vscode.window.showErrorMessage(`Alloy jar not found at ${alloyJar} (from ${source}). Set "alloy.jarPath".`);
+    return;
+  }
+  if (!fs.existsSync(serverJar)) {
+    vscode.window.showErrorMessage(`Bridge jar missing at ${serverJar}. Run "npm run bundle" in the extension folder.`);
+    return;
+  }
+  output.appendLine(`[alloy] java: ${java}`);
+  output.appendLine(`[alloy] alloy jar (${source}): ${alloyJar}`);
 
   cndClient = new CnDServerClient(java, alloyJar, serverJar, (m) => output.append(m));
   try {
@@ -50,7 +62,7 @@ async function openForActiveFile(context: vscode.ExtensionContext): Promise<void
   } catch (e) {
     vscode.window.showErrorMessage(
       `Could not start the Alloy backend: ${e instanceof Error ? e.message : String(e)}. ` +
-        `Ensure Java 11+ is installed and set "alloy.javaPath" if needed.`
+        `Check Java 17+ ("alloy.javaPath") and that the Alloy jar is 6.x ("alloy.jarPath").`
     );
     tearDown();
     return;
@@ -87,23 +99,6 @@ async function openForActiveFile(context: vscode.ExtensionContext): Promise<void
 let counter = 0;
 function idCounter(): string {
   return String(++counter);
-}
-
-function resolveJava(): string {
-  const configured = vscode.workspace.getConfiguration('alloy').get<string>('javaPath');
-  if (configured && configured.trim().length > 0) return configured.trim();
-  // The Alloy Analyzer requires Java 11+. JAVA_HOME (if newer) beats a possibly-old `java` on PATH.
-  if (process.env.JAVA_HOME) {
-    const j = path.join(process.env.JAVA_HOME, 'bin', 'java');
-    if (fs.existsSync(j)) return j;
-  }
-  return 'java';
-}
-
-function resolveAlloyJar(context: vscode.ExtensionContext): string {
-  const configured = vscode.workspace.getConfiguration('alloy').get<string>('jarPath');
-  if (configured && configured.trim().length > 0) return configured.trim();
-  return context.asAbsolutePath(path.join('server', 'org.alloytools.alloy.dist.jar'));
 }
 
 function tearDown(): void {

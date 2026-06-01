@@ -63,12 +63,12 @@
         "alloy.javaPath": {
           "type": "string",
           "default": "",
-          "description": "Path to a Java 11+ executable used to run the Alloy Analyzer. Leave empty to use JAVA_HOME, then 'java' on PATH."
+          "description": "Path to a Java 17+ executable for the Alloy Analyzer. Leave empty to auto-detect (JAVA_HOME, then an installed JDK 17+, then 'java')."
         },
         "alloy.jarPath": {
           "type": "string",
           "default": "",
-          "description": "Override path to the Alloy Analyzer jar (org.alloytools.alloy.dist.jar). Leave empty to use the jar bundled with the extension."
+          "description": "Path to an Alloy Analyzer jar (Alloy 6+). Leave empty to auto-detect an Alloy install (workspace, Downloads, Desktop, /Applications), then fall back to the bundled jar."
         }
       }
     }
@@ -81,9 +81,11 @@
     "package": "vsce package"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.5",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.93.0",
     "@types/ws": "^8.5.10",
