@@ -1,0 +1,7 @@
+node_modules/
+out/
+build/
+*.vsix
+# Build artifacts produced by `npm run bundle` (regenerated from the Alloy + CnD builds):
+server/
+media/copeanddrag/

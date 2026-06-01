@@ -1,0 +1,93 @@
+{
+  "name": "cope-and-drag-alloy",
+  "displayName": "Cope and Drag for Alloy",
+  "description": "Pairs the Alloy Analyzer with the Cope and Drag visualizer in a VS Code webview.",
+  "author": "Siddhartha Prasad",
+  "publisher": "SiddharthaPrasad",
+  "license": "MIT",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Visualization"
+  ],
+  "keywords": [
+    "alloy",
+    "cope and drag",
+    "formal methods"
+  ],
+  "activationEvents": [
+    "onLanguage:alloy"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "alloy",
+        "aliases": [
+          "Alloy",
+          "alloy"
+        ],
+        "extensions": [
+          ".als"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "alloy.openCnd",
+        "title": "Open Cope and Drag",
+        "category": "Alloy",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "editorLangId == alloy",
+          "command": "alloy.openCnd",
+          "group": "navigation@0"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Alloy + Cope and Drag",
+      "properties": {
+        "alloy.javaPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to a Java 11+ executable used to run the Alloy Analyzer. Leave empty to use JAVA_HOME, then 'java' on PATH."
+        },
+        "alloy.jarPath": {
+          "type": "string",
+          "default": "",
+          "description": "Override path to the Alloy Analyzer jar (org.alloytools.alloy.dist.jar). Leave empty to use the jar bundled with the extension."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run bundle && npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "bundle": "node scripts/bundle-assets.js",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.93.0",
+    "@types/ws": "^8.5.10",
+    "@vscode/vsce": "^2.24.0",
+    "typescript": "^5.3.3"
+  }
+}
