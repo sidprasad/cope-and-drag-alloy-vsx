@@ -26,40 +26,42 @@ stock Cope and Drag (`build:forge`, unmodified).
 
 ## Build & run (dev)
 
-Prerequisites: **JDK 11+** (to compile the bridge and run Alloy), Node 18+, an Alloy jar, and a CnD
-`build:forge` bundle.
+Prerequisites: **JDK 17+** (to compile the bridge), Node 18+, and a CnD `build:forge` bundle.
+The extension does **not** bundle an Alloy jar — the build downloads a pinned Alloy release just to
+*compile* the bridge against, and the extension downloads Alloy at runtime (see below).
 
 ```bash
 npm install
 
-# Compile the bridge + bundle the Alloy jar and CnD dist (set JAVA_HOME to a JDK 17+):
+# Compile the bridge (downloads the pinned Alloy release into build/) + copy the CnD dist:
 JAVA_HOME=/path/to/jdk-17 npm run bundle
 
 npm run compile
 ```
 
-`npm run bundle` writes `server/cnd-alloy-server.jar`, `server/org.alloytools.alloy.dist.jar`, and
-`media/copeanddrag/` (all gitignored). Override the inputs with `ALLOY_JAR` and `CND_DIST`.
+`npm run bundle` writes `server/cnd-alloy-server.jar` (the bridge, ~5 KB) and `media/copeanddrag/`.
+Override the inputs with `ALLOY_JAR` (skip the download) and `CND_DIST`. No Alloy jar is packaged.
 
 Then open this folder in VS Code and press **F5**. In the dev host, open a `.als` file and run
 **"Open Cope and Drag"** (the editor-title graph icon). The first command runs automatically; use
 CnD's UI to pick other commands, evaluate expressions, and step through instances.
 
-## Finding Alloy & Java (auto-detect or bring your own)
+## Finding Alloy & Java (no bundled jar)
 
 Both are resolved automatically; override either if needed.
 
 **Alloy jar** — `alloy.jarPath` → `ALLOY_JAR` env → an auto-detected **Alloy 6+** install
-(workspace, `~/Downloads`, `~/Desktop`, `/Applications`) → the bundled jar. Older Alloy (5.x) is
-skipped (it lacks the API + enumerable solver this needs). So you can just drop a recent Alloy jar
-in your Downloads, or point `alloy.jarPath` at one — the bridge only calls Alloy's *public API*, so
-any reasonably recent 6.x jar works.
+(workspace, `~/Downloads`, `~/Desktop`, `/Applications`) → a previously-downloaded copy in the
+extension's global storage. If none of those exist, the extension offers to **download the pinned
+Alloy release once** (cached) or to pick a local jar. Older Alloy (5.x) is skipped — it lacks the
+API + enumerable solver this needs. The bridge only calls Alloy's *public API*, so any reasonably
+recent 6.x jar works.
 
 **Java** — `alloy.javaPath` → `JAVA_HOME` → the newest installed **JDK 17+** (via
-`/usr/libexec/java_home` on macOS, common JVM dirs elsewhere) → `java`. The bundled Alloy build is
-Java-17 bytecode, so a JDK 17+ is required; auto-detect finds it even if your default `java` is older.
+`/usr/libexec/java_home` on macOS, common JVM dirs elsewhere) → `java`. The Alloy release is Java-17
+bytecode, so a JDK 17+ is required; auto-detect finds it even if your default `java` is older.
 
 ## Settings
 
 - `alloy.javaPath` — explicit Java 17+ executable (otherwise auto-detected).
-- `alloy.jarPath` — explicit Alloy 6+ jar (otherwise auto-detected, then bundled).
+- `alloy.jarPath` — explicit Alloy 6+ jar (otherwise auto-detected, then downloaded on demand).

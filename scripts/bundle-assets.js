@@ -1,73 +1,103 @@
 #!/usr/bin/env node
 /*
- * Prepares everything the extension ships with — fork-free:
- *   1. compiles the Alloy bridge (alloy-bridge/CnDServer.java) against an Alloy jar
- *      -> server/cnd-alloy-server.jar
- *   2. copies that Alloy jar                                    -> server/org.alloytools.alloy.dist.jar
- *   3. copies the Cope and Drag forge bundle                    -> media/copeanddrag/
+ * Prepares what the extension ships — note it does NOT bundle the Alloy jar (the extension
+ * downloads that at runtime, or uses an auto-detected / configured one):
+ *   1. compiles the Alloy bridge (alloy-bridge/CnDServer.java) against a pinned Alloy release
+ *      (downloaded once into build/)  ->  server/cnd-alloy-server.jar
+ *   2. copies the Cope and Drag forge bundle  ->  media/copeanddrag/
  *
- * The bridge only *calls* Alloy's public API, so any compatible Alloy jar works (bring your own).
- *
- * Requires a JDK 11+ (for javac/jar). Configure via env:
- *   JAVA_HOME  - JDK to compile the bridge with (default: `javac`/`jar` on PATH)
- *   ALLOY_JAR  - the Alloy Analyzer jar (default: ../mainline-alloy build output)
+ * Requires a JDK 17+ (javac/jar). Configure via env:
+ *   JAVA_HOME  - JDK to compile the bridge with (default: javac/jar on PATH)
+ *   ALLOY_JAR  - Alloy jar to compile against (default: download the pinned release into build/)
  *   CND_DIST   - the Cope and Drag forge build (default: ../../../spytial-org/copeanddrag/dist)
  */
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { execSync } = require('child_process');
 
-const root = path.resolve(__dirname, '..');
-const t1710 = path.resolve(root, '..');
+// Pinned, verified-compatible Alloy release. Keep in sync with src/downloadAlloy.ts.
+const ALLOY_VERSION = '6.2.0';
+const ALLOY_URL = `https://github.com/AlloyTools/org.alloytools.alloy/releases/download/v${ALLOY_VERSION}/org.alloytools.alloy.dist.jar`;
 
-const ALLOY_JAR =
-  process.env.ALLOY_JAR ||
-  path.join(t1710, 'mainline-alloy', 'org.alloytools.alloy.dist', 'target', 'org.alloytools.alloy.dist.jar');
-const CND_DIST =
-  process.env.CND_DIST || path.resolve(t1710, '..', '..', 'spytial-org', 'copeanddrag', 'dist');
+const root = path.resolve(__dirname, '..');
+const buildDir = path.join(root, 'build');
+const serverDir = path.join(root, 'server');
+const mediaDir = path.join(root, 'media', 'copeanddrag');
+const bridgeSrc = path.join(root, 'alloy-bridge', 'src', 'org', 'alloytools', 'cnd', 'CnDServer.java');
+const bridgeOut = path.join(buildDir, 'bridge-out');
+const CND_DIST = process.env.CND_DIST || path.resolve(root, '..', '..', '..', 'spytial-org', 'copeanddrag', 'dist');
 
 const JAVA_HOME = process.env.JAVA_HOME || '';
 const javac = JAVA_HOME ? path.join(JAVA_HOME, 'bin', 'javac') : 'javac';
 const jartool = JAVA_HOME ? path.join(JAVA_HOME, 'bin', 'jar') : 'jar';
-
-const serverDir = path.join(root, 'server');
-const mediaDir = path.join(root, 'media', 'copeanddrag');
-const bridgeSrc = path.join(root, 'alloy-bridge', 'src', 'org', 'alloytools', 'cnd', 'CnDServer.java');
-const bridgeOut = path.join(root, 'build', 'bridge-out');
 
 function fail(msg) {
   console.error(`\n[bundle] ${msg}\n`);
   process.exit(1);
 }
 
-if (!fs.existsSync(ALLOY_JAR)) fail(`Alloy jar not found:\n  ${ALLOY_JAR}\nBuild it or set ALLOY_JAR.`);
-
-// 1. compile the bridge against the Alloy jar
-fs.rmSync(bridgeOut, { recursive: true, force: true });
-fs.mkdirSync(bridgeOut, { recursive: true });
-fs.mkdirSync(serverDir, { recursive: true });
-console.log(`[bundle] compiling bridge (${javac}) against ${path.basename(ALLOY_JAR)}`);
-try {
-  execSync(`"${javac}" -cp "${ALLOY_JAR}" -d "${bridgeOut}" "${bridgeSrc}"`, { stdio: 'inherit' });
-  execSync(
-    `"${jartool}" cfe "${path.join(serverDir, 'cnd-alloy-server.jar')}" org.alloytools.cnd.CnDServer -C "${bridgeOut}" .`,
-    { stdio: 'inherit' }
-  );
-} catch (e) {
-  fail(`Failed to build the bridge. Set JAVA_HOME to a JDK 11+ (current javac: ${javac}).`);
+function download(url, dest, redirects = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirects > 5) return reject(new Error('too many redirects'));
+    https
+      .get(url, (res) => {
+        const s = res.statusCode || 0;
+        if (s >= 300 && s < 400 && res.headers.location) {
+          res.resume();
+          return resolve(download(res.headers.location, dest, redirects + 1));
+        }
+        if (s !== 200) {
+          res.resume();
+          return reject(new Error(`HTTP ${s}`));
+        }
+        const out = fs.createWriteStream(dest);
+        res.pipe(out);
+        out.on('finish', () => out.close(() => resolve()));
+        out.on('error', reject);
+      })
+      .on('error', reject);
+  });
 }
-console.log('[bundle] bridge -> server/cnd-alloy-server.jar');
 
-// 2. copy the Alloy jar
-fs.copyFileSync(ALLOY_JAR, path.join(serverDir, 'org.alloytools.alloy.dist.jar'));
-console.log('[bundle] alloy  -> server/org.alloytools.alloy.dist.jar');
+async function main() {
+  // 1. Alloy jar to compile the bridge against (downloaded, cached in build/; NOT bundled).
+  let alloyJar = process.env.ALLOY_JAR && fs.existsSync(process.env.ALLOY_JAR) ? process.env.ALLOY_JAR : '';
+  if (!alloyJar) {
+    fs.mkdirSync(buildDir, { recursive: true });
+    alloyJar = path.join(buildDir, `alloy-${ALLOY_VERSION}.dist.jar`);
+    if (!fs.existsSync(alloyJar)) {
+      console.log(`[bundle] downloading Alloy ${ALLOY_VERSION} to compile the bridge against...`);
+      await download(ALLOY_URL, alloyJar).catch((e) => fail(`download failed: ${e.message}`));
+    }
+  }
+  console.log(`[bundle] compile against: ${alloyJar}`);
 
-// 3. copy the Cope and Drag forge bundle
-if (!fs.existsSync(path.join(CND_DIST, 'index.html')))
-  fail(`Cope and Drag forge bundle not found:\n  ${CND_DIST}\nRun "yarn build:forge" in copeanddrag, or set CND_DIST.`);
-fs.rmSync(mediaDir, { recursive: true, force: true });
-fs.mkdirSync(mediaDir, { recursive: true });
-fs.cpSync(CND_DIST, mediaDir, { recursive: true });
-console.log('[bundle] cnd    -> media/copeanddrag/');
+  // 2. compile the bridge (fresh server/ so no stale bundled jar lingers)
+  fs.rmSync(serverDir, { recursive: true, force: true });
+  fs.mkdirSync(serverDir, { recursive: true });
+  fs.rmSync(bridgeOut, { recursive: true, force: true });
+  fs.mkdirSync(bridgeOut, { recursive: true });
+  try {
+    execSync(`"${javac}" -cp "${alloyJar}" -d "${bridgeOut}" "${bridgeSrc}"`, { stdio: 'inherit' });
+    execSync(
+      `"${jartool}" cfe "${path.join(serverDir, 'cnd-alloy-server.jar')}" org.alloytools.cnd.CnDServer -C "${bridgeOut}" .`,
+      { stdio: 'inherit' }
+    );
+  } catch {
+    fail(`Failed to build the bridge. Set JAVA_HOME to a JDK 17+ (current javac: ${javac}).`);
+  }
+  console.log('[bundle] bridge -> server/cnd-alloy-server.jar');
 
-console.log('[bundle] done.');
+  // 3. copy the Cope and Drag forge bundle (the Alloy jar is intentionally NOT bundled)
+  if (!fs.existsSync(path.join(CND_DIST, 'index.html')))
+    fail(`Cope and Drag forge bundle not found:\n  ${CND_DIST}\nRun "yarn build:forge" in copeanddrag, or set CND_DIST.`);
+  fs.rmSync(mediaDir, { recursive: true, force: true });
+  fs.mkdirSync(mediaDir, { recursive: true });
+  fs.cpSync(CND_DIST, mediaDir, { recursive: true });
+  console.log('[bundle] cnd    -> media/copeanddrag/');
+
+  console.log('[bundle] done — Alloy jar is downloaded at runtime, not bundled.');
+}
+
+main().catch((e) => fail(e.message));

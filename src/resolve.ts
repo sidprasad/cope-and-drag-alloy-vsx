@@ -4,9 +4,10 @@ import * as os from 'os';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import AdmZip from 'adm-zip';
+import { cachedAlloyJar } from './downloadAlloy';
 
-// The bundled Alloy 6.3 build is compiled to Java 17 bytecode. resolveJava prefers the newest
-// JDK anyway, so this is just the floor for what counts as "usable".
+// The pinned Alloy release is Java 17 bytecode. resolveJava prefers the newest JDK anyway, so this
+// is just the floor for what counts as "usable".
 const MIN_JAVA = 17;
 const MIN_ALLOY_MAJOR = 6;
 
@@ -14,7 +15,7 @@ const MIN_ALLOY_MAJOR = 6;
 
 /**
  * Resolve a Java 17+ executable: `alloy.javaPath` → JAVA_HOME → OS auto-detect → `java`.
- * The bundled Alloy Analyzer needs Java 17+; the machine's default `java` may be older.
+ * The Alloy Analyzer needs Java 17+; the machine's default `java` may be older.
  */
 export function resolveJava(): string {
   const configured = vscode.workspace.getConfiguration('alloy').get<string>('javaPath');
@@ -72,15 +73,16 @@ function javaExe(): string {
 
 // ─── Alloy jar ─────────────────────────────────────────────────────────────────
 
-export type AlloyJarSource = 'configured' | 'env' | 'detected' | 'bundled' | 'none';
+export type AlloyJarSource = 'configured' | 'env' | 'detected' | 'cached' | 'none';
 export interface AlloyJarResolution {
   jar?: string;
   source: AlloyJarSource;
 }
 
 /**
- * Resolve an Alloy jar: `alloy.jarPath` → `ALLOY_JAR` → auto-detected install (Alloy 6+) →
- * the jar bundled with the extension. Configured/env paths are trusted as-is.
+ * Resolve an Alloy jar *without downloading*: `alloy.jarPath` → `ALLOY_JAR` → auto-detected
+ * install (Alloy 6+) → a previously-downloaded jar in global storage. Returns `none` if nothing is
+ * available yet — the caller then offers to download one (see obtainAlloyJar). Nothing is bundled.
  */
 export function resolveAlloyJar(context: vscode.ExtensionContext): AlloyJarResolution {
   const configured = vscode.workspace.getConfiguration('alloy').get<string>('jarPath');
@@ -93,8 +95,8 @@ export function resolveAlloyJar(context: vscode.ExtensionContext): AlloyJarResol
   const detected = detectAlloyJar();
   if (detected) return { jar: detected, source: 'detected' };
 
-  const bundled = context.asAbsolutePath(path.join('server', 'org.alloytools.alloy.dist.jar'));
-  if (fs.existsSync(bundled)) return { jar: bundled, source: 'bundled' };
+  const cached = cachedAlloyJar(context);
+  if (cached) return { jar: cached, source: 'cached' };
 
   return { source: 'none' };
 }

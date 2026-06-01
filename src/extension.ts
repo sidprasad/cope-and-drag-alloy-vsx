@@ -5,6 +5,7 @@ import { CnDServerClient } from './cndServerClient';
 import { SterlingProvider, SterlingInstance } from './sterlingProvider';
 import { openCndWebview, disposeCndWebview } from './cndWebview';
 import { resolveJava, resolveAlloyJar } from './resolve';
+import { obtainAlloyJar } from './downloadAlloy';
 
 let cndClient: CnDServerClient | undefined;
 let provider: SterlingProvider | undefined;
@@ -36,15 +37,18 @@ async function openForActiveFile(context: vscode.ExtensionContext): Promise<void
   tearDown();
 
   const java = resolveJava();
-  const { jar: alloyJar, source } = resolveAlloyJar(context);
-  const serverJar = context.asAbsolutePath(path.join('server', 'cnd-alloy-server.jar'));
+  const resolution = resolveAlloyJar(context);
+  let alloyJar = resolution.jar;
+  let source: string = resolution.source;
 
+  // Nothing found locally — offer to download the pinned Alloy release (or pick a local jar).
   if (!alloyJar) {
-    vscode.window.showErrorMessage(
-      'No Alloy Analyzer found. Set "alloy.jarPath" to an Alloy 6+ jar, or rebuild the extension ("npm run bundle") to bundle one.'
-    );
-    return;
+    alloyJar = await obtainAlloyJar(context);
+    source = 'downloaded';
+    if (!alloyJar) return; // user declined or the download failed (already reported)
   }
+
+  const serverJar = context.asAbsolutePath(path.join('server', 'cnd-alloy-server.jar'));
   if (!fs.existsSync(alloyJar)) {
     vscode.window.showErrorMessage(`Alloy jar not found at ${alloyJar} (from ${source}). Set "alloy.jarPath".`);
     return;
