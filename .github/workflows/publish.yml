@@ -37,6 +37,20 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      # On a tag push, the tag must match package.json's version (you can't republish a version).
+      # Skipped for manual runs (workflow_dispatch from a branch), which publish package.json as-is.
+      - name: Check tag matches package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag version: $tag | package.json version: $pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' does not match package.json version '$pkg'. Bump \"version\" in package.json (or retag) so they match."
+            exit 1
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
