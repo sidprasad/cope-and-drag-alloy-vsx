@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 /**
- * Shows a "Run / Check in Cope and Drag" CodeLens above each Alloy command (`run` / `check`).
+ * Shows a "Run"/"Check" CodeLens above each Alloy command (`run` / `check`) that runs it in Cope and Drag.
  *
  * Commands are matched by scanning the source top-to-bottom — which is the same order the Alloy
  * Analyzer itself reports them (verified) — so the Nth lens maps to command index N that the bridge
@@ -19,7 +19,7 @@ export class AlloyCommandCodeLensProvider implements vscode.CodeLensProvider {
       const pos = document.positionAt(m.index);
       lenses.push(
         new vscode.CodeLens(new vscode.Range(pos, pos), {
-          title: `$(play) ${verb} in Cope and Drag`,
+          title: `$(play) ${verb}`,
           command: 'alloy.runCommand',
           arguments: [document.uri, index]
         })
