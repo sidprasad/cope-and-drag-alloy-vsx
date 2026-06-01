@@ -128,9 +128,13 @@ export class SterlingProvider {
       }
 
       case 'click': {
-        // "Run <generator>" button in CnD's explorer.
-        const generatorName = msg.payload?.context?.generatorName;
-        const inst = await this.safe(() => this.handlers.run(generatorName));
+        // Two sources of clicks: a datum's "Next" button (onClick 'next' -> enumerate) and the
+        // explorer's "Run <generator>" button (onClick 'run' / context.generatorName -> run).
+        const onClick = msg.payload?.onClick;
+        const inst =
+          onClick === 'next'
+            ? await this.safe(() => this.handlers.next())
+            : await this.safe(() => this.handlers.run(msg.payload?.context?.generatorName));
         if (inst) {
           this.current = inst;
           this.broadcast(this.dataMessage(inst));
@@ -178,7 +182,10 @@ export class SterlingProvider {
             generatorName: inst.generatorName,
             format: 'alloy',
             data: inst.xml,
-            evaluator: true
+            evaluator: true,
+            // The graph header renders a button per entry; clicking sends a `click` with this
+            // `onClick`, which we route to enumeration. Without this there is no "Next" control.
+            buttons: [{ text: 'Next', onClick: 'next', mouseover: 'Show the next instance' }]
           }
         ],
         update: [],
