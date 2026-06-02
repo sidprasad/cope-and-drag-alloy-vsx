@@ -1,13 +1,13 @@
-// Temporal model (Alloy 6 `var`): an activation wave over a fixed node set.
-// Active nodes only grow until all are active. Cope and Drag shows the whole
-// trace and lets you step through states; "Next" gets a different trace.
-sig Node {}
-var sig Active in Node {}
+// Temporal model (Alloy 6 `var`): a set of "active" atoms that grows over time.
+// Open Cope and Drag, then use the TIME panel (right edge) to step through trace
+// states; "Next" fetches a different trace. (Top-level `var sig` — not an `in`
+// subset sig, which the current Cope and Drag build can't parse.)
+var sig Active {}
 
-pred wave {
-  no Active                    -- start: nothing active
-  always (Active in Active')   -- activation only grows
-  eventually (Active = Node)   -- ends with everything active
+pred grow {
+  one Active                     -- start with a single active atom
+  always (Active in Active')     -- the active set only ever grows
+  eventually (#Active > 1)       -- and it does grow
 }
 
-run wave for exactly 3 Node
+run grow for 4 but exactly 5 steps
