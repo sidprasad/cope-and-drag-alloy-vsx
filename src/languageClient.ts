@@ -23,7 +23,15 @@ export function startAlloyLsp(context: vscode.ExtensionContext): void {
   const { jar } = resolveAlloyJar(context);
   if (!jar || !fs.existsSync(jar)) return; // no jar yet — caller retries after one is obtained
 
-  const executable = { command: resolveJava(), args: ['-jar', jar, 'lsp'] };
+  // Quiet the Alloy LSP's lsp4j INFO chatter (e.g. "Unsupported notification method: $/setTrace")
+  // by raising its java.util.logging level to WARNING. Harmless either way if the file is missing.
+  const jvmArgs: string[] = [];
+  const loggingProps = context.asAbsolutePath('lsp-logging.properties');
+  if (fs.existsSync(loggingProps)) {
+    jvmArgs.push(`-Djava.util.logging.config.file=${loggingProps}`);
+  }
+
+  const executable = { command: resolveJava(), args: [...jvmArgs, '-jar', jar, 'lsp'] };
   const serverOptions: ServerOptions = { run: executable, debug: executable };
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ language: 'alloy' }],
