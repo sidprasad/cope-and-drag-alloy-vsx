@@ -1,11 +1,17 @@
 .vscode/**
+.github/**
 src/**
+out/**
 alloy-bridge/**
 scripts/**
 build/**
+examples/**
 node_modules/**
+esbuild.js
 **/tsconfig.json
 **/*.map
 **/*.ts
 .gitignore
-# Keep: out/**, server/**, media/**, language-configuration.json, package.json, README.md
+# Ship: dist/extension.js (bundled), server/** (Java bridge jar), media/** (Cope and Drag webapp),
+# syntaxes/**, *-configuration.json, icon.png, lsp-logging.properties, package.json, README.md,
+# CHANGELOG.md, LICENSE

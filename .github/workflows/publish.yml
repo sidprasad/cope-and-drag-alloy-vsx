@@ -14,7 +14,7 @@ on:
       cnd_release:
         description: 'copeanddrag release tag to pull the Sterling (forge) dist from'
         required: false
-        default: 'v4.0.4'
+        default: 'v4.0.6'
 
 permissions:
   contents: read
@@ -71,8 +71,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Runs `vscode:prepublish` (npm run bundle && npm run compile): compiles the Java bridge
-      # against a pinned Alloy release (downloaded), copies CND_DIST -> media/, and builds the TS.
+      # Runs `vscode:prepublish` (compile [typecheck] -> bundle:assets -> bundle:js --production):
+      # compiles the Java bridge against a pinned Alloy release (downloaded), copies CND_DIST ->
+      # media/, and esbuild-bundles the extension TS -> dist/extension.js.
       # JAVA_HOME is set by setup-java; CND_DIST is set above.
       - name: Package VSIX
         run: npx @vscode/vsce package -o cope-and-drag-alloy.vsix
