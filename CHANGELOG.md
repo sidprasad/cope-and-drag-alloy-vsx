@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 — Fix activation
+
+- **Fix:** the extension failed to activate (`Cannot find module 'ws'`) because its runtime
+  dependencies were neither packaged nor bundled. The extension is now bundled with esbuild
+  into a single `dist/extension.js`, so it activates without a `node_modules` tree.
+
 ## 0.1.0 — Initial release
 
 - Open the **Cope and Drag** visualizer for an Alloy `.als` model in a webview, with full
