@@ -4,12 +4,12 @@
  * downloads that at runtime, or uses an auto-detected / configured one):
  *   1. compiles the Alloy bridge (alloy-bridge/CnDServer.java) against a pinned Alloy release
  *      (downloaded once into build/)  ->  server/cnd-alloy-server.jar
- *   2. copies the Cope and Drag forge bundle  ->  media/copeanddrag/
+ *   2. copies the Cope and Drag Alloy build  ->  media/copeanddrag/
  *
  * Requires a JDK 17+ (javac/jar). Configure via env:
  *   JAVA_HOME  - JDK to compile the bridge with (default: javac/jar on PATH)
  *   ALLOY_JAR  - Alloy jar to compile against (default: download the pinned release into build/)
- *   CND_DIST   - the Cope and Drag forge build (default: ../../../spytial-org/copeanddrag/dist)
+ *   CND_DIST   - the Cope and Drag Alloy build (`build:alloy`; default: ../../../spytial-org/copeanddrag/dist)
  */
 const fs = require('fs');
 const path = require('path');
@@ -89,13 +89,28 @@ async function main() {
   }
   console.log('[bundle] bridge -> server/cnd-alloy-server.jar');
 
-  // 3. copy the Cope and Drag forge bundle (the Alloy jar is intentionally NOT bundled)
+  // 3. copy the Cope and Drag Alloy build (the Alloy jar is intentionally NOT bundled)
   if (!fs.existsSync(path.join(CND_DIST, 'index.html')))
-    fail(`Cope and Drag forge bundle not found:\n  ${CND_DIST}\nRun "yarn build:forge" in copeanddrag, or set CND_DIST.`);
+    fail(`Cope and Drag Alloy build not found:\n  ${CND_DIST}\nRun "yarn build:alloy" in copeanddrag, or set CND_DIST.`);
   fs.rmSync(mediaDir, { recursive: true, force: true });
   fs.mkdirSync(mediaDir, { recursive: true });
   fs.cpSync(CND_DIST, mediaDir, { recursive: true });
   console.log('[bundle] cnd    -> media/copeanddrag/');
+
+  // 3a. The Alloy build hardcodes its Sterling URL (ws://localhost:4000/alloy); the extension
+  // rewrites it to the live ephemeral port at serve time (see src/cndWebview.ts). Fail loudly if
+  // it's missing/duplicated so we never ship a bundle that can't connect (e.g. a forge build).
+  const WS_LITERAL = 'ws://localhost:4000/alloy';
+  const jsFiles = fs.readdirSync(mediaDir).filter((f) => f.endsWith('.js'));
+  let wsHits = 0;
+  for (const f of jsFiles) wsHits += fs.readFileSync(path.join(mediaDir, f), 'utf8').split(WS_LITERAL).length - 1;
+  if (wsHits !== 1)
+    fail(
+      `Expected exactly one "${WS_LITERAL}" across media/copeanddrag/*.js (the Alloy build's\n` +
+        `  Sterling URL the extension rewrites at runtime) but found ${wsHits}. Did you build CnD with\n` +
+        `  "build:alloy" (or use sterling-alloy.zip)?  CND_DIST=${CND_DIST}`
+    );
+  console.log('[bundle] verified Alloy Sterling URL literal (rewritten to the live port at serve time)');
 
   console.log('[bundle] done — Alloy jar is downloaded at runtime, not bundled.');
 }

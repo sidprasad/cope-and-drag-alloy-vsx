@@ -1,6 +1,6 @@
 # Cope and Drag for Alloy
 
-Pairs the **Alloy Analyzer** with the **[Cope and Drag](https://github.com/spytial-org/copeanddrag)** (CnD)
+Pairs the **Alloy Analyzer** with the **[Cope and Drag](https://github.com/sidprasad/copeanddrag)** (CnD)
 visualizer inside VS Code. Run a command in a `.als` model and explore the instance in a webview with
 full interactivity — **instances, evaluator, and next/previous enumeration** — straight from Alloy's
 own engine.
@@ -83,12 +83,17 @@ The bridge (`alloy-bridge/CnDServer.java`) only *calls* Alloy's public API
 runs against any compatible Alloy jar. The extension translates between that socket and the Sterling
 websocket protocol Cope and Drag speaks.
 
+The bundled Cope and Drag is its **Alloy** build — the explorer drawer is collapsed by default, so a
+run opens straight to the graph. That build hardcodes its websocket URL, so the extension rewrites it
+to the live provider port as it serves the bundle.
+
 ## Building from source
 
-Prerequisites: **JDK 17+**, **Node 18+**, and a Cope and Drag `build:forge` bundle.
+Prerequisites: **JDK 17+**, **Node 18+**, and a Cope and Drag `build:alloy` bundle.
 
 ```bash
 npm install
+# CND_DIST is a Cope and Drag dist built with `yarn build:alloy`
 JAVA_HOME=/path/to/jdk-17 CND_DIST=/path/to/copeanddrag/dist npm run bundle
 npm run compile
 ```

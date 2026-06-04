@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 — Open straight to the graph
+
+- **Change:** bundle Cope and Drag's **Alloy** build instead of the Forge build, so a run opens
+  straight to the graph with the explorer drawer collapsed (no more explorer panel by default). The
+  Alloy build's hardcoded Sterling websocket URL is rewritten to the extension's live ephemeral port
+  as the bundle is served, so instances, evaluation, and next/previous enumeration keep working.
+
 ## 0.1.1 — Fix activation
 
 - **Fix:** the extension failed to activate (`Cannot find module 'ws'`) because its runtime
