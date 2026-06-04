@@ -6,10 +6,12 @@ import * as path from 'path';
 /**
  * Cope and Drag in a VS Code webview.
  *
- * CnD (built `provider=forge`, so it reads its websocket port from the `?<port>` query) is served
- * from a tiny loopback HTTP server and embedded in an <iframe> pointed at
- * `http://127.0.0.1:<staticPort>/?<wsPort>`. CnD then connects directly to the Sterling provider
- * (backed by the Alloy Analyzer) over that websocket — the same shape the Forge extension uses.
+ * We ship CnD's **Alloy** build (`build:alloy`), which starts with the explorer drawer collapsed so
+ * the graph shows immediately. That build hardcodes its Sterling websocket URL to
+ * `ws://localhost:4000/alloy`; since our Sterling provider binds an *ephemeral* port, the loopback
+ * HTTP server rewrites that one literal to the live port (`ws://localhost:<wsPort>/alloy`) as it
+ * serves the JS. CnD is embedded in an <iframe> pointed at `http://127.0.0.1:<staticPort>/` and
+ * connects directly to the Sterling provider (backed by the Alloy Analyzer) over that websocket.
  */
 
 let panel: vscode.WebviewPanel | undefined;
@@ -17,6 +19,10 @@ let server: http.Server | undefined;
 let staticPort: number | undefined;
 let lastFrameUri: vscode.Uri | undefined;
 let reloadToken = 0;
+// The Alloy build compiles in this fixed Sterling URL; we rewrite it to the live provider port as
+// we serve the JS (see the file header). Set whenever the panel is (re)opened.
+const CND_WS_LITERAL = 'ws://localhost:4000/alloy';
+let currentWsPort: number | undefined;
 // Called when the user closes the panel (so the extension can tear the session down). Cleared
 // before a programmatic dispose so closing it ourselves doesn't re-enter teardown.
 let onClose: (() => void) | undefined;
@@ -54,8 +60,19 @@ function ensureServer(root: string): Promise<number> {
         if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
           filePath = path.join(root, 'index.html');
         }
-        res.setHeader('Content-Type', MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream');
-        fs.createReadStream(filePath).pipe(res);
+        const ext = path.extname(filePath).toLowerCase();
+        res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
+        // Rewrite the Alloy build's hardcoded Sterling URL to our live ephemeral port. The literal
+        // lives in main.bundle.js, but we scan every .js chunk so a CnD reshuffle can't break it.
+        if (ext === '.js' && currentWsPort) {
+          const js = fs
+            .readFileSync(filePath, 'utf8')
+            .split(CND_WS_LITERAL)
+            .join(`ws://localhost:${currentWsPort}/alloy`);
+          res.end(js);
+        } else {
+          fs.createReadStream(filePath).pipe(res);
+        }
       } catch {
         res.statusCode = 500;
         res.end('Internal error');
@@ -92,8 +109,9 @@ export async function openCndWebview(
     return;
   }
 
+  currentWsPort = wsPort; // the served JS is rewritten to dial this port (see file header)
   const port = await ensureServer(root);
-  const frameUri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${port}/?${wsPort}`));
+  const frameUri = await vscode.env.asExternalUri(vscode.Uri.parse(`http://127.0.0.1:${port}/`));
   lastFrameUri = frameUri;
   onClose = closeCb;
   const html = getHtml(frameUri);
@@ -135,6 +153,7 @@ export function disposeCndWebview(): void {
   panel?.dispose();
   panel = undefined;
   lastFrameUri = undefined;
+  currentWsPort = undefined;
   if (server) {
     server.close();
     server = undefined;
@@ -143,7 +162,7 @@ export function disposeCndWebview(): void {
 }
 
 function getHtml(frameUri: vscode.Uri): string {
-  const src = frameUri.toString(true); // skipEncoding so the `?<wsPort>` query is preserved
+  const src = frameUri.toString(true);
   const frameOrigin = `${frameUri.scheme}://${frameUri.authority}`;
   // The iframe is a normal http origin (no CSP of its own), so CnD's scripts, the d3 CDN load, and
   // the ws:// connection all happen inside it. `https:` in frame-src covers the d3 CDN.

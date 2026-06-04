@@ -2,7 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 /**
  * A Sterling "provider" — the websocket server side of the Sterling protocol that Cope and Drag
- * (built with provider=forge / WS=query) connects to. We bridge it to the Alloy language server:
+ * (the Alloy build) connects to. We bridge it to the Alloy language server:
  * instances come from the LS's solver runs, and `eval` / `next` are forwarded to the LS's
  * EvaluateAlloyExpression / NextInstance requests.
  *

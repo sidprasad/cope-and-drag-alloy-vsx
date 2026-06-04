@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       cnd_release:
-        description: 'copeanddrag release tag to pull the Sterling (forge) dist from'
+        description: 'copeanddrag release tag to pull the Sterling (Alloy) dist from'
         required: false
         default: 'v4.0.6'
 
@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 env:
-  # The extension does not build Cope and Drag; it ships a prebuilt build:forge dist pulled from
+  # The extension does not build Cope and Drag; it ships a prebuilt build:alloy dist pulled from
   # this public release. Bump when you want a newer Cope and Drag (workflow_dispatch can override).
   CND_RELEASE: ${{ github.event.inputs.cnd_release || 'v4.0.6' }}
 
@@ -57,10 +57,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Fetch Cope and Drag (forge) dist
+      - name: Fetch Cope and Drag (Alloy) dist
         run: |
           set -euo pipefail
-          url="https://github.com/sidprasad/copeanddrag/releases/download/${CND_RELEASE}/sterling-forge.zip"
+          url="https://github.com/sidprasad/copeanddrag/releases/download/${CND_RELEASE}/sterling-alloy.zip"
           echo "Downloading $url"
           curl -fsSL -o sterling-forge.zip "$url"
           mkdir -p cnd-dist
