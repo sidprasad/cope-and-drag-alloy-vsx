@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 — Update Cope and Drag
+
+- **Change:** bundle Cope and Drag **v4.0.7** (was v4.0.6).
+
 ## 0.1.2 — Open straight to the graph
 
 - **Change:** bundle Cope and Drag's **Alloy** build instead of the Forge build, so a run opens
