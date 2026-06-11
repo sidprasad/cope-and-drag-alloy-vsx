@@ -110,6 +110,7 @@
     "bundle:js": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "package": "vsce package",
+    "update:cnd": "node scripts/update-cnd.js",
     "tag": "node scripts/tag-release.js"
   },
   "dependencies": {
