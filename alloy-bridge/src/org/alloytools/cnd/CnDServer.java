@@ -156,7 +156,7 @@ public class CnDServer {
     }
 
     private String doList() throws Exception {
-        ensureParsed();
+        reloadWorld();
         JsonArray arr = new JsonArray();
         for (Command c : world.getAllCommands()) arr.add(c.label);
         JsonObject r = ok();
@@ -165,7 +165,7 @@ public class CnDServer {
     }
 
     private String doRun(int index) throws Exception {
-        ensureParsed();
+        reloadWorld();
         List<Command> commands = world.getAllCommands();
         if (commands.isEmpty()) return err("This model has no commands to run.");
         if (index < 0 || index >= commands.size()) index = 0;
@@ -209,9 +209,15 @@ public class CnDServer {
         return gson.toJson(r);
     }
 
-    private void ensureParsed() throws Exception {
-        if (world == null)
-            world = CompUtil.parseEverything_fromFile(rep, new HashMap<String, String>(), filename);
+    /**
+     * (Re)parse the model from disk. Called before every list/run so edits to the .als are picked
+     * up: the extension keeps one CnDServer alive per file across runs, so a parse-once cache would
+     * pin the model to its first version and re-runs would silently replay the stale spec. Parsing
+     * is cheap next to solving; `next`/`eval` keep using the A4Solution captured at the last run, so
+     * in-progress enumeration is unaffected.
+     */
+    private void reloadWorld() throws Exception {
+        world = CompUtil.parseEverything_fromFile(rep, new HashMap<String, String>(), filename);
     }
 
     private String toXML(A4Solution sol) throws Exception {
