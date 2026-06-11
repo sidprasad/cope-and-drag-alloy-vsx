@@ -33,6 +33,8 @@ export function activate(context: vscode.ExtensionContext): void {
     { dispose: tearDown }
   );
 
+  logBundledCndVersion(context);
+
   // On-save error checking via Alloy's compiler (the bridge's `check`), published as diagnostics.
   activateDiagnostics(context);
 
@@ -43,6 +45,22 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
   tearDown();
+}
+
+/**
+ * Log the bundled Cope and Drag build to the output channel so the running version is visible
+ * during debug. The build stamps itself in media/copeanddrag/version.json (see scripts/fetch-cnd.js
+ * and bundle-assets.js); locally that's whatever you last pulled/bundled, which can differ from the
+ * release the Publish workflow ships.
+ */
+function logBundledCndVersion(context: vscode.ExtensionContext): void {
+  try {
+    const raw = fs.readFileSync(context.asAbsolutePath(path.join('media', 'copeanddrag', 'version.json')), 'utf8');
+    const v = JSON.parse(raw);
+    output.appendLine(`Cope and Drag v${v.version} (${v.build} build, built ${v.timestamp})`);
+  } catch {
+    output.appendLine('Cope and Drag: bundled build version unknown (no media/copeanddrag/version.json).');
+  }
 }
 
 /** "Open Cope and Drag" (title bar): open the session for the active file and run its first command. */
