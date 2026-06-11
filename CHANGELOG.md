@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 — Update Cope and Drag
+
+- **Change:** bundle Cope and Drag **v4.0.10** (was v4.0.7).
+- **Tooling:** `npm run update:cnd` bumps the bundled Cope and Drag release; `npm run cnd:fetch`
+  pulls a release's Alloy build into `media/copeanddrag/` for local debug. Activation now logs the
+  bundled Cope and Drag version to the output channel.
+
 ## 0.1.3 — Update Cope and Drag
 
 - **Change:** bundle Cope and Drag **v4.0.7** (was v4.0.6).
