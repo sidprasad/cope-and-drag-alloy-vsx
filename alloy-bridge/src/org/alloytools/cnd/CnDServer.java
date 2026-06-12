@@ -56,6 +56,10 @@ public class CnDServer {
     private final A4Reporter rep = new A4Reporter();
     private final Gson gson = new Gson();
 
+    // `world` is the module that produced `current`: they are set together on a successful run and
+    // `eval` parses expressions against `world` while evaluating them on `current`, so the two must
+    // never drift. Only doRun touches `world`; listing parses into a throwaway so a metadata refresh
+    // can't repoint eval at a newer file than the instance on screen.
     private CompModule world;
     private A4Solution current;
 
@@ -156,23 +160,34 @@ public class CnDServer {
     }
 
     private String doList() throws Exception {
-        ensureParsed();
+        // Parse into a local module to enumerate commands. The extension calls list on every connect
+        // and meta refresh, not just before a run, so this must NOT touch `world`: doing so would
+        // repoint a later eval at this file version while `current` still holds the displayed instance.
+        CompModule w = reparse();
         JsonArray arr = new JsonArray();
-        for (Command c : world.getAllCommands()) arr.add(c.label);
+        for (Command c : w.getAllCommands()) arr.add(c.label);
         JsonObject r = ok();
         r.add("commands", arr);
         return gson.toJson(r);
     }
 
     private String doRun(int index) throws Exception {
-        ensureParsed();
-        List<Command> commands = world.getAllCommands();
+        // A rerun invalidates whatever was on screen, so drop the active solution before reparsing.
+        // If the edited file no longer parses, has no commands, or is unsatisfiable, we bail out with
+        // `current` already cleared, so next/eval can't keep enumerating the previous (stale) model.
+        current = null;
+        world = null;
+        CompModule w = reparse();
+        List<Command> commands = w.getAllCommands();
         if (commands.isEmpty()) return err("This model has no commands to run.");
         if (index < 0 || index >= commands.size()) index = 0;
         Command c = commands.get(index);
-        current = TranslateAlloyToKodkod.execute_commandFromBook(rep, world.getAllReachableSigs(), c, opt);
-        if (current == null || !current.satisfiable())
+        A4Solution sol = TranslateAlloyToKodkod.execute_commandFromBook(rep, w.getAllReachableSigs(), c, opt);
+        if (sol == null || !sol.satisfiable())
             return err("No instance found" + (c.check ? " (no counterexample)." : " (unsatisfiable)."));
+        // Pair the solved module with its solution only now that the run succeeded.
+        world = w;
+        current = sol;
         return instanceJson(c.label);
     }
 
@@ -209,9 +224,15 @@ public class CnDServer {
         return gson.toJson(r);
     }
 
-    private void ensureParsed() throws Exception {
-        if (world == null)
-            world = CompUtil.parseEverything_fromFile(rep, new HashMap<String, String>(), filename);
+    /**
+     * Parse the model from disk, returning a fresh module. Called before every list/run so edits to
+     * the .als are picked up: the extension keeps one CnDServer alive per file across runs, so a
+     * parse-once cache would pin the model to its first version and re-runs would silently replay the
+     * stale spec. Parsing is cheap next to solving. Callers decide whether the result becomes the
+     * `world` paired with `current` (doRun, on success) or is used and discarded (doList).
+     */
+    private CompModule reparse() throws Exception {
+        return CompUtil.parseEverything_fromFile(rep, new HashMap<String, String>(), filename);
     }
 
     private String toXML(A4Solution sol) throws Exception {
