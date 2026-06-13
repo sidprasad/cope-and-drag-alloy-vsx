@@ -5,6 +5,8 @@ import * as path from 'path';
 export interface Instance {
   command?: string;
   xml: string;
+  /** True for temporal (trace) instances — gates the trace-only nav buttons (config/init/fork). */
+  temporal?: boolean;
 }
 
 /**
@@ -94,15 +96,19 @@ export class CnDServerClient {
 
   private toInstance(r: any): Instance {
     if (!r.ok) throw new Error(r.error);
-    return { command: r.command, xml: r.xml };
+    return { command: r.command, xml: r.xml, temporal: r.temporal };
   }
 
   run(index: number): Promise<Instance> {
     return this.rpc({ op: 'run', index }).then((r) => this.toInstance(r));
   }
 
-  next(): Promise<Instance> {
-    return this.rpc({ op: 'next' }).then((r) => this.toInstance(r));
+  /**
+   * Enumerate via Alloy's `A4Solution.fork(state)`, the primitive behind the Analyzer's trace
+   * buttons: -3 = next/"New Trace", -1 = "New Config", 0 = "New Init", n>=0 = "New Fork" at state n.
+   */
+  fork(state: number): Promise<Instance> {
+    return this.rpc({ op: 'fork', state }).then((r) => this.toInstance(r));
   }
 
   evaluate(expr: string): Promise<string> {

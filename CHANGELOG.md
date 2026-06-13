@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.5 — Update Cope and Drag + trace navigation
+
+- **Feature:** temporal (trace) instances now offer the Alloy Analyzer's trace-navigation
+  buttons — **New Config**, **New Trace**, and **New Init** — each mapping to `A4Solution.fork(-1
+  / -3 / 0)`; static instances keep a single **Next**. (Alloy's "New Fork" is omitted: it forks at
+  the on-screen trace state, which the visualizer's click protocol doesn't surface to the bridge.)
+  The Java bridge gains a generic `fork` op and reports a `temporal` flag.
+- **Change:** bundle Cope and Drag **v4.0.11** (was v4.0.10). v4.0.11 reworks the Sterling shell
+  into a compact, de-branded layout tuned for the narrow VS Code webview (bottom-docked drawer,
+  view-switcher dropdown, slimmer headers). The upgrade itself is a presentation-only refactor on
+  the Cope and Drag side — the Sterling provider protocol (meta / data / click / eval, datum
+  buttons) is unchanged, so it needed no extension changes beyond the bundle bump.
+
 ## 0.1.4 — Update Cope and Drag
 
 - **Change:** bundle Cope and Drag **v4.0.10** (was v4.0.7).

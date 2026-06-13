@@ -42,8 +42,17 @@ import edu.mit.csail.sdg.translator.TranslateAlloyToKodkod;
  *
  *   {"op":"list"}                          -> {"ok":true,"commands":["run$1", ...]}
  *   {"op":"run","index":0}                 -> {"ok":true,"command":"run$1","xml":"<alloy>...</alloy>"}
- *   {"op":"next"}                          -> {"ok":true,"xml":"..."}            | {"ok":false,"error":"..."}
+ *   {"op":"next"}                          -> {"ok":true,"xml":"...","temporal":<bool>}             (alias for fork -3)
+ *   {"op":"fork","state":-1}               -> {"ok":true,"xml":"...","temporal":<bool>}  | {"ok":false,"error":"..."}
  *   {"op":"eval","expr":"Node","state":0}  -> {"ok":true,"result":"{Node$0}"}    | {"ok":false,"error":"..."}
+ *
+ * `temporal` is the model's A4Solution.isTemporal() (it tracks the model, not the op or fork state).
+ *
+ * `fork.state` is the arg to Alloy's {@link A4Solution#fork(int)} — the single primitive behind all
+ * of the Analyzer's trace-navigation buttons: -3 = "New Trace" (== next()), -1 = "New Config",
+ * 0 = "New Init", n>=0 = "New Fork" at trace state n. The extension currently wires only -3/-1/0
+ * (it has no displayed-state index to drive "New Fork"). Responses carry `temporal` so the caller
+ * can surface the config/init variants only for traces.
  *
  * Instances, enumeration (next), and evaluation all use Alloy's own API, so behaviour matches the
  * analyzer exactly. The Node "Sterling provider" in the VS Code extension translates between this
@@ -149,7 +158,8 @@ public class CnDServer {
             switch (op) {
                 case "list":   return doList();
                 case "run":    return doRun(req.has("index") ? req.get("index").getAsInt() : 0);
-                case "next":   return doNext();
+                case "next":   return doFork(-3); // "New Trace": A4Solution.next() is literally fork(-3).
+                case "fork":   return doFork(req.has("state") ? req.get("state").getAsInt() : -3);
                 case "eval":   return doEval(req.get("expr").getAsString(),
                                              req.has("state") ? req.get("state").getAsInt() : 0);
                 default:       return err("Unknown op: " + op);
@@ -191,10 +201,19 @@ public class CnDServer {
         return instanceJson(c.label);
     }
 
-    private String doNext() throws Exception {
+    /**
+     * Enumerate via Alloy's own {@link A4Solution#fork(int)} — the single primitive behind every
+     * trace-navigation button in the Alloy Analyzer:
+     *   -3 = next / "New Trace" (A4Solution.next() is literally fork(-3))
+     *   -1 = "New Config"   0 = "New Init"   n>=0 = "New Fork" (a new trace agreeing up to state n)
+     * The config/init variants are only meaningful for temporal models; the extension surfaces those
+     * buttons only for traces (gated on the `temporal` flag in instanceJson). The n>=0 "New Fork"
+     * case stays supported here as a generic primitive even though no button currently drives it.
+     */
+    private String doFork(int state) throws Exception {
         if (current == null) return err("Run a command before asking for the next instance.");
         if (!current.isIncremental()) return err("This solution cannot be enumerated.");
-        A4Solution next = current.next();
+        A4Solution next = current.fork(state);
         if (next == null || !next.satisfiable()) return err("There are no more satisfying instances.");
         current = next;
         return instanceJson(null);
@@ -202,12 +221,15 @@ public class CnDServer {
 
     /**
      * Standard instance response. For temporal models the XML already contains the full trace (all
-     * states + loopback metadata), so Cope and Drag handles stepping through states itself.
+     * states + loopback metadata), so Cope and Drag handles stepping through states itself. The
+     * `temporal` flag lets the extension show the trace-only nav buttons (config/init/fork) just for
+     * traces, while plain "Next" (fork -3) stays available for every model.
      */
     private String instanceJson(String command) throws Exception {
         JsonObject r = ok();
         if (command != null) r.addProperty("command", command);
         r.addProperty("xml", toXML(current));
+        r.addProperty("temporal", current.isTemporal());
         return gson.toJson(r);
     }
 

@@ -2,9 +2,9 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 /**
  * A Sterling "provider" — the websocket server side of the Sterling protocol that Cope and Drag
- * (the Alloy build) connects to. We bridge it to the Alloy language server:
- * instances come from the LS's solver runs, and `eval` / `next` are forwarded to the LS's
- * EvaluateAlloyExpression / NextInstance requests.
+ * (the Alloy build) connects to. We bridge it to the CnD Java backend (CnDServer): instances,
+ * enumeration, and evaluation are forwarded to that bridge over its JSON socket as
+ * `{op:'run'|'fork'|'eval'}` (see SterlingHandlers, wired in extension.ts -> CnDServerClient).
  *
  * Wire protocol (see copeanddrag/packages/sterling-connection):
  *   client -> server : raw "ping"; or JSON {type:'meta'|'data'|'click'|'eval', version, payload?}
@@ -19,6 +19,8 @@ export interface SterlingInstance {
   id: string;
   xml: string;
   generatorName?: string;
+  /** True for temporal (trace) instances — shows the trace-only nav buttons (config/init/fork). */
+  temporal?: boolean;
 }
 
 export interface SterlingHandlers {
@@ -26,11 +28,24 @@ export interface SterlingHandlers {
   getGenerators(): Promise<string[]>;
   /** Run a command (by name, or the default) and return its instance. */
   run(generatorName: string | undefined): Promise<SterlingInstance | null>;
-  /** Enumerate the next instance of the current command. */
-  next(): Promise<SterlingInstance | null>;
+  /**
+   * Enumerate the next instance via Alloy's `fork(state)`, the primitive behind the Analyzer's
+   * trace buttons: -3 = next/"New Trace", -1 = "New Config", 0 = "New Init".
+   */
+  fork(state: number): Promise<SterlingInstance | null>;
   /** Evaluate an expression against the current instance; return the result string. */
   evaluate(expression: string): Promise<string>;
 }
+
+// The Analyzer's trace-navigation buttons each map to one `A4Solution.fork(state)` arg. We expose
+// the three that need no extra state: New Trace (also the plain "Next"), New Config, and New Init.
+// ("New Fork" forks at the *displayed* trace state, which the click protocol doesn't carry, so it's
+// intentionally omitted.)
+/** Alloy's fork() arg for the plain "next instance" / "New Trace" enumeration. */
+const FORK_NEXT = -3;
+/** fork() args for the temporal-only nav buttons. */
+const FORK_CONFIG = -1;
+const FORK_INIT = 0;
 
 export class SterlingProvider {
   private wss: WebSocketServer | undefined;
@@ -119,7 +134,7 @@ export class SterlingProvider {
           if (this.current) this.sendJson(ws, this.dataMessage(this.current));
           break;
         }
-        const inst = await this.safe(() => this.handlers.next());
+        const inst = await this.safe(() => this.handlers.fork(FORK_NEXT));
         if (inst) {
           this.current = inst;
           this.sendJson(ws, this.dataMessage(inst));
@@ -128,12 +143,18 @@ export class SterlingProvider {
       }
 
       case 'click': {
-        // A datum's "Next" button (onClick 'next' -> enumerate) or the explorer's
-        // "Run <generator>" button (onClick 'run' / context.generatorName -> run).
+        // A datum's trace-nav button -> enumerate via fork(state); or the explorer's
+        // "Run <generator>" button (context.generatorName) -> run.
+        //   next -> fork(-3) "New Trace"   config -> fork(-1) "New Config"   init -> fork(0) "New Init"
         const onClick = msg.payload?.onClick;
+        const forkState =
+          onClick === 'next'   ? FORK_NEXT   :
+          onClick === 'config' ? FORK_CONFIG :
+          onClick === 'init'   ? FORK_INIT   :
+          undefined;
         const inst =
-          onClick === 'next'
-            ? await this.safe(() => this.handlers.next())
+          forkState !== undefined
+            ? await this.safe(() => this.handlers.fork(forkState))
             : await this.safe(() => this.handlers.run(msg.payload?.context?.generatorName));
         if (inst) {
           this.current = inst;
@@ -183,16 +204,33 @@ export class SterlingProvider {
             format: 'alloy',
             data: inst.xml,
             evaluator: true,
-            // The graph header renders a button per entry; clicking sends a `click` with this
-            // `onClick`, which we route to enumeration. Without this there is no "Next" control.
-            // (Temporal trace navigation is handled by Cope and Drag itself, given the full trace.)
-            buttons: [{ text: 'Next', onClick: 'next', mouseover: 'Show the next instance' }]
+            // The graph header renders a button per entry; clicking sends a `click` with the
+            // button's `onClick`, which we route to fork-based enumeration (see onMessage 'click').
+            // Without these there is no enumeration control. Stepping *within* a trace is handled by
+            // Cope and Drag itself (it has the full trace); these buttons ask the solver for a new one.
+            buttons: this.navButtons(inst)
           }
         ],
         update: [],
         exit: []
       }
     };
+  }
+
+  /**
+   * The enumeration buttons shown in the graph header. Non-temporal models get a single "Next"
+   * (fork -3). Temporal models get the Analyzer's trace-navigation buttons that need no extra
+   * state — New Config (fork -1), New Trace (fork -3), and New Init (fork 0) — since those only
+   * make sense once there's a trace to vary. `onClick` strings are routed in onMessage.
+   */
+  private navButtons(inst: SterlingInstance) {
+    const next = { text: 'New Trace', onClick: 'next', mouseover: 'Solve for a different trace' };
+    if (!inst.temporal) return [{ ...next, text: 'Next', mouseover: 'Show the next instance' }];
+    return [
+      { text: 'New Config', onClick: 'config', mouseover: 'Solve for a different configuration' },
+      next,
+      { text: 'New Init', onClick: 'init', mouseover: 'Keep the configuration; solve for a different initial state' }
+    ];
   }
 
   private broadcast(obj: unknown): void {
