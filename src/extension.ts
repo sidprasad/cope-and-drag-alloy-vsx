@@ -135,7 +135,10 @@ async function ensureSession(context: vscode.ExtensionContext, file: string): Pr
       const r = await client.fork(state);
       return buildInstance(r.xml, currentCommand ?? '', r.temporal);
     },
-    evaluate: (expr) => client.evaluate(expr)
+    evaluate: (expr) => client.evaluate(expr),
+    // Surface a failed enumeration/run from a graph-header button (e.g. "There are no more
+    // satisfying instances.") transiently, so a deliberate click isn't a silent no-op.
+    notify: (message) => void vscode.window.setStatusBarMessage(`Alloy: ${message}`, 4000)
   });
   const wsPort = await provider.start();
   // Closing the panel tears the whole session down (kills the Java backend + ws server), so the

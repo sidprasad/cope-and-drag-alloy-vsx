@@ -35,6 +35,12 @@ export interface SterlingHandlers {
   fork(state: number): Promise<SterlingInstance | null>;
   /** Evaluate an expression against the current instance; return the result string. */
   evaluate(expression: string): Promise<string>;
+  /**
+   * Surface a user-facing message when a click-driven action (enumeration or run) fails — e.g. the
+   * solver reports "no more satisfying instances". Optional; if absent, failures are dropped. The
+   * connect-time `data` fetch stays silent regardless, since a failure there is expected.
+   */
+  notify?(message: string): void;
 }
 
 // The Analyzer's trace-navigation buttons each map to one `A4Solution.fork(state)` arg. We expose
@@ -154,8 +160,8 @@ export class SterlingProvider {
           undefined;
         const inst =
           forkState !== undefined
-            ? await this.safe(() => this.handlers.fork(forkState))
-            : await this.safe(() => this.handlers.run(msg.payload?.context?.generatorName));
+            ? await this.enumerate(() => this.handlers.fork(forkState))
+            : await this.enumerate(() => this.handlers.run(msg.payload?.context?.generatorName));
         if (inst) {
           this.current = inst;
           this.broadcast(this.dataMessage(inst));
@@ -245,6 +251,21 @@ export class SterlingProvider {
     try {
       return await fn();
     } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Like `safe`, but for explicit user button clicks: a failure (e.g. the solver has no further
+   * instance) is surfaced via `handlers.notify` rather than dropped, since a silent no-op on a
+   * deliberate click reads as "broken". The connect-time `data` fetch deliberately keeps using
+   * `safe` so its expected "run a command first" error doesn't toast.
+   */
+  private async enumerate(fn: () => Promise<SterlingInstance | null>): Promise<SterlingInstance | null> {
+    try {
+      return await fn();
+    } catch (e) {
+      this.handlers.notify?.(e instanceof Error ? e.message : String(e));
       return null;
     }
   }

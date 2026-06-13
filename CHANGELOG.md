@@ -6,7 +6,9 @@
   buttons — **New Config**, **New Trace**, and **New Init** — each mapping to `A4Solution.fork(-1
   / -3 / 0)`; static instances keep a single **Next**. (Alloy's "New Fork" is omitted: it forks at
   the on-screen trace state, which the visualizer's click protocol doesn't surface to the bridge.)
-  The Java bridge gains a generic `fork` op and reports a `temporal` flag.
+  The Java bridge gains a generic `fork` op and reports a `temporal` flag. When a button's
+  enumeration has no further instance, the solver's reason (e.g. "no more satisfying instances") is
+  shown transiently in the status bar instead of the click silently doing nothing.
 - **Change:** bundle Cope and Drag **v4.0.11** (was v4.0.10). v4.0.11 reworks the Sterling shell
   into a compact, de-branded layout tuned for the narrow VS Code webview (bottom-docked drawer,
   view-switcher dropdown, slimmer headers). The upgrade itself is a presentation-only refactor on
