@@ -73,15 +73,17 @@ on demand.
 ```
 .als ─"Open Cope and Drag"─▶ extension spawns
         java -cp <alloy.jar>:<cnd-alloy-server.jar> org.alloytools.cnd.CnDServer <port> <file>
-                                          │  (calls the Alloy API: run / next / eval)
+                                          │  (calls the Alloy API: run / fork / eval)
                                           │  line-based JSON socket
    Sterling provider (Node, in-extension) ── Sterling ws ─▶ <iframe> Cope and Drag
 ```
 
 The bridge (`alloy-bridge/CnDServer.java`) only *calls* Alloy's public API
-(`execute_commandFromBook`, `A4Solution.next()`/`.eval()`, `A4SolutionWriter.writeInstance`), so it
-runs against any compatible Alloy jar. The extension translates between that socket and the Sterling
-websocket protocol Cope and Drag speaks.
+(`execute_commandFromBook`, `A4Solution.fork(int)`/`.eval()`, `A4SolutionWriter.writeInstance`), so it
+runs against any compatible Alloy jar. Enumeration goes through `fork(int)`, the primitive behind the
+Analyzer's trace buttons (`next()` is `fork(-3)`); for temporal models the explorer offers New Config,
+New Trace, and New Init. The extension translates between that socket and the Sterling websocket
+protocol Cope and Drag speaks.
 
 The bundled Cope and Drag is its **Alloy** build — the explorer drawer is collapsed by default, so a
 run opens straight to the graph. That build hardcodes its websocket URL, so the extension rewrites it
