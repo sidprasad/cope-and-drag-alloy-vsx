@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6 — Update Cope and Drag
+
+- **Change:** bundle Cope and Drag **v4.0.13** (was v4.0.11). v4.0.13 reworks the Sterling drawer
+  to surface its sections as tabs (with the Time section shown only for temporal traces) and adds
+  Single / Sliding Window / Compare presentation modes to the Time panel for stepping through trace
+  states. Like the v4.0.11 bump, these are presentation-only changes on the Cope and Drag side — the
+  Sterling provider protocol (meta / data / click / eval, datum buttons) is unchanged, so the
+  upgrade needed no extension changes beyond the bundle bump.
+
 ## 0.1.5 — Update Cope and Drag + trace navigation
 
 - **Feature:** temporal (trace) instances now offer the Alloy Analyzer's trace-navigation
