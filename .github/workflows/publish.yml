@@ -14,7 +14,7 @@ on:
       cnd_release:
         description: 'copeanddrag release tag to pull the Sterling (Alloy) dist from'
         required: false
-        default: 'v4.0.13'
+        default: 'v4.0.19'
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ permissions:
 env:
   # The extension does not build Cope and Drag; it ships a prebuilt build:alloy dist pulled from
   # this public release. Bump when you want a newer Cope and Drag (workflow_dispatch can override).
-  CND_RELEASE: ${{ github.event.inputs.cnd_release || 'v4.0.13' }}
+  CND_RELEASE: ${{ github.event.inputs.cnd_release || 'v4.0.19' }}
 
 jobs:
   publish:
