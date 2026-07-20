@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.7 — Update Cope and Drag
+
+- **Change:** bundle Cope and Drag **v4.0.19** (was v4.0.13). v4.0.19 drops the graph's built-in
+  per-graph Mode (theme) dropdown — Cope and Drag drives theming globally, so the per-graph control
+  could desync the graph from the app chrome — links the help modal to the Cope and Drag docs, and
+  picks up spytial-core 3.0.1 plus a round of dependency updates. As with the 4.0.11 and 4.0.13
+  bumps, nothing here touches the Sterling provider protocol (meta / data / click / eval, datum
+  buttons) or the hardcoded Sterling websocket URL the extension rewrites, so the upgrade needed no
+  extension changes beyond the bundle bump.
+
 ## 0.1.6 — Update Cope and Drag
 
 - **Change:** bundle Cope and Drag **v4.0.13** (was v4.0.11). v4.0.13 reworks the Sterling drawer
