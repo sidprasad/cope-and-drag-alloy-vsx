@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.8 — Update Cope and Drag
+
+- **Change:** bundle Cope and Drag **v4.6.0** (was v4.0.19). This is a larger jump than the prior
+  4.0.x bumps — it spans v4.1, v4.3, and v4.5 — and the first that adds user-facing Cope and Drag
+  features rather than presentation-only tweaks: **Magic / Suggest / Describe Layout**, which author
+  a `.cnd` layout spec from natural language and heuristics. It also removes the old synthesis panel,
+  roughly halves the Alloy bundle (~7.7 MB → ~3.8 MB) by dropping unused Monaco language workers and
+  iOS splash images, and picks up spytial-core 3.4.0.
+- **Compatibility:** despite the version span, the Sterling provider protocol the extension's bridge
+  speaks (meta / data / click / eval, datum buttons, and the fork-backed **New Config / New Trace /
+  New Init** trace navigation) is byte-for-byte unchanged, and the hardcoded Sterling websocket URL
+  the extension rewrites still appears exactly once in the Alloy build. So — as with the 4.0.x bumps —
+  the upgrade needed no extension changes beyond the bundle bump.
+
 ## 0.1.7 — Update Cope and Drag
 
 - **Change:** bundle Cope and Drag **v4.0.19** (was v4.0.13). v4.0.19 drops the graph's built-in
