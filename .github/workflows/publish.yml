@@ -14,7 +14,7 @@ on:
       cnd_release:
         description: 'copeanddrag release tag to pull the Sterling (Alloy) dist from'
         required: false
-        default: 'v4.0.19'
+        default: 'v4.8.0'
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ permissions:
 env:
   # The extension does not build Cope and Drag; it ships a prebuilt build:alloy dist pulled from
   # this public release. Bump when you want a newer Cope and Drag (workflow_dispatch can override).
-  CND_RELEASE: ${{ github.event.inputs.cnd_release || 'v4.0.19' }}
+  CND_RELEASE: ${{ github.event.inputs.cnd_release || 'v4.8.0' }}
 
 jobs:
   publish:
@@ -62,9 +62,9 @@ jobs:
           set -euo pipefail
           url="https://github.com/sidprasad/copeanddrag/releases/download/${CND_RELEASE}/sterling-alloy.zip"
           echo "Downloading $url"
-          curl -fsSL -o sterling-forge.zip "$url"
+          curl -fsSL -o sterling-alloy.zip "$url"
           mkdir -p cnd-dist
-          unzip -q sterling-forge.zip -d cnd-dist
+          unzip -q sterling-alloy.zip -d cnd-dist
           test -f cnd-dist/index.html
           echo "CND_DIST=$PWD/cnd-dist" >> "$GITHUB_ENV"
 

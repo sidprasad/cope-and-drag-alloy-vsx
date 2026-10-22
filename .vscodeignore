@@ -5,6 +5,7 @@ out/**
 alloy-bridge/**
 scripts/**
 build/**
+.alloy-xml/**
 examples/**
 node_modules/**
 esbuild.js
