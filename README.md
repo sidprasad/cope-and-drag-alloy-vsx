@@ -85,7 +85,7 @@ Analyzer's trace buttons (`next()` is `fork(-3)`); for temporal models the explo
 New Trace, and New Init. The extension translates between that socket and the Sterling websocket
 protocol Cope and Drag speaks.
 
-The bundled Cope and Drag is its **Alloy** build — the explorer drawer is collapsed by default, so a
+The bundled Cope and Drag is **v4.8.0**, using its **Alloy** build — the explorer drawer is collapsed by default, so a
 run opens straight to the graph. That build hardcodes its websocket URL, so the extension rewrites it
 to the live provider port as it serves the bundle.
 
@@ -96,13 +96,17 @@ Prerequisites: **JDK 17+**, **Node 18+**, and a Cope and Drag `build:alloy` bund
 ```bash
 npm install
 # CND_DIST is a Cope and Drag dist built with `yarn build:alloy`
-JAVA_HOME=/path/to/jdk-17 CND_DIST=/path/to/copeanddrag/dist npm run bundle
+JAVA_HOME=/path/to/jdk-17 CND_DIST=/path/to/copeanddrag/dist npm run bundle:assets
 npm run compile
 ```
 
-`npm run bundle` writes `server/cnd-alloy-server.jar` (the bridge) and `media/copeanddrag/`. No Alloy
+`npm run bundle:assets` writes `server/cnd-alloy-server.jar` (the bridge) and `media/copeanddrag/`. No Alloy
 jar is packaged — it's downloaded at runtime or auto-detected. Press **F5** to launch an Extension
 Development Host.
+
+To refresh an existing local debug setup to the same Cope and Drag release as the Publish workflow,
+run `npm run cnd:fetch -- --pinned`. `npm run update:cnd` updates the publication pin to the latest
+release that includes an Alloy bundle; commit that change with a new extension version before publishing.
 
 ## License
 

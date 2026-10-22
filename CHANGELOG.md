@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8 — Update Cope and Drag
+
+- **Change:** bundle Cope and Drag **v4.8.0** (was v4.0.19), using the release's `sterling-alloy.zip` build. Both the tagged-release default and manual Publish workflow default use v4.8.0.
+- **Packaging:** exclude local `.alloy-xml/` debug artifacts from the VSIX.
+
 ## 0.1.7 — Update Cope and Drag
 
 - **Change:** bundle Cope and Drag **v4.0.19** (was v4.0.13). v4.0.19 drops the graph's built-in
